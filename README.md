@@ -6,3 +6,6 @@ pip install scageclock
 ```python
 import scageclock as sac
 ```
+
+## about
+authors: Gangcai Xie (Medical School of Nantong University); [ORCID](https://orcid.org/0000-0002-8286-2987)
