@@ -85,34 +85,37 @@ def load_GMA_model(model_file,
 
 
 # training, validation and testing of the model
-def train_val_test_pipeline(model_name: str = "GMA",
-                            suffix: str = "pb",
-                            run_id: str = "v1",
-                            ad_dir_root: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/",
-                            meta_file_path: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet",
-                            batch_size_train: int = 1024,
-                            train_batch_iter_max: int = 1000,
-                            batch_size_val: int = 10240,
-                            batch_size_test: int = 10240,
-                            l1_lambda: float = 0.01,
-                            l2_lambda: float = 0.01,
-                            predict_batch_iter_max: int = 20,
-                            learning_rate: float = 0.001,
-                            nn_weight_decay: float = 0.0001,  # weight decay for neural network
-                            epochs: int = 1,
-                            loader_method: str = "scageclock",
-                            num_workers: int = 1,
-                            device: str = "cuda",
-                            loss: str = "MSE",
-                            model_save_method: str = "stat_dict",
-                            # supports one of [stat_dict, pkl, joblib, cbm] , cbm (for catboost)
-                            get_feature_importance: bool = False,
-                            boost_depth: int = 6,
-                            boost_iteration: int = 100,
-                            cat_used_ram_limit: str = "100GB",
-                            cat_n_embed: int = 4,  ## number of embedding for the categorical feature, only used in eGMA
-                            **kwargs
-                            ):
+def training_pipeline(model_name: str = "GMA",
+                      suffix: str = "pb",
+                      run_id: str = "v1",
+                      ad_dir_root: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/",
+                      meta_file_path: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet",
+                      predict_dataset: str = "validation",
+                      model_eval: bool = True, ## whether to evaluation of the model, such as based on validation datasets or testing datasets
+                      validation_during_training: bool = True,
+                      batch_size_train: int = 1024,
+                      train_batch_iter_max: int = 1000,
+                      batch_size_val: int = 10240,
+                      batch_size_test: int = 10240,
+                      l1_lambda: float = 0.01,
+                      l2_lambda: float = 0.01,
+                      predict_batch_iter_max: int = 20,
+                      learning_rate: float = 0.001,
+                      nn_weight_decay: float = 0.0001,  # weight decay for neural network
+                      epochs: int = 1,
+                      loader_method: str = "scageclock",
+                      num_workers: int = 1,
+                      device: str = "cuda",
+                      loss: str = "MSE",
+                      model_save_method: str = "stat_dict",
+                      # supports one of [stat_dict, pkl, joblib, cbm] , cbm (for catboost)
+                      get_feature_importance: bool = False,
+                      boost_depth: int = 6,
+                      boost_iteration: int = 100,
+                      cat_used_ram_limit: str = "100GB",
+                      cat_n_embed: int = 4,  ## number of embedding for the categorical feature, only used in eGMA
+                      **kwargs
+                      ):
     start_time = time.time()
 
     ## checking the inputs
@@ -147,6 +150,8 @@ def train_val_test_pipeline(model_name: str = "GMA",
     # load the age clock model
     if model_name == "GMA":
         age_clock = GMA(anndata_dir_root=ad_dir_root,
+                        predict_dataset=predict_dataset,
+                        validation_during_training=validation_during_training,
                         feature_size=feature_size,
                         n_embed=cat_n_embed,
                         batch_size_train=batch_size_train,
@@ -172,11 +177,13 @@ def train_val_test_pipeline(model_name: str = "GMA",
         else:
             device = None
         age_clock = CatBoostAgeClock(anndata_dir_root=ad_dir_root,
+                                     predict_dataset=predict_dataset,
+                                     validation_during_training=validation_during_training,
                                      batch_size_train=batch_size_train,
                                      train_batch_iter_max=train_batch_iter_max,
                                      batch_size_val=batch_size_val,
                                      batch_size_test=batch_size_test,
-                                     test_batch_iter_max=predict_batch_iter_max,
+                                     predict_batch_iter_max=predict_batch_iter_max,
                                      task_type=device,
                                      loader_method=loader_method,
                                      learning_rate=learning_rate,
@@ -188,21 +195,25 @@ def train_val_test_pipeline(model_name: str = "GMA",
                                      )
     elif model_name == "xgboost":
         age_clock = XGBoostAgeClock(anndata_dir_root=ad_dir_root,
-                                     batch_size_train=batch_size_train,
-                                     train_batch_iter_max=train_batch_iter_max,
-                                     batch_size_val=batch_size_val,
-                                     batch_size_test=batch_size_test,
-                                     test_batch_iter_max=predict_batch_iter_max,
-                                     device=device,
-                                     loader_method=loader_method,
-                                     learning_rate=learning_rate,
-                                     log_file=log_file,
-                                     max_depth=boost_depth,
-                                     n_estimators=boost_iteration,
-                                     **kwargs
-                                     )
+                                    predict_dataset=predict_dataset,
+                                    validation_during_training=validation_during_training,
+                                    batch_size_train=batch_size_train,
+                                    train_batch_iter_max=train_batch_iter_max,
+                                    batch_size_val=batch_size_val,
+                                    batch_size_test=batch_size_test,
+                                    predict_batch_iter_max=predict_batch_iter_max,
+                                    device=device,
+                                    loader_method=loader_method,
+                                    learning_rate=learning_rate,
+                                    log_file=log_file,
+                                    max_depth=boost_depth,
+                                    n_estimators=boost_iteration,
+                                    **kwargs
+                                    )
     elif model_name == "linear":
         age_clock = TorchElasticNetAgeClock(anndata_dir_root=ad_dir_root,
+                                            predict_dataset=predict_dataset,
+                                            validation_during_training=validation_during_training,
                                             feature_size=feature_size,
                                             batch_size_train=batch_size_train,
                                             train_batch_iter_max=train_batch_iter_max,
@@ -210,7 +221,7 @@ def train_val_test_pipeline(model_name: str = "GMA",
                                             batch_size_test=batch_size_test,
                                             l1_lambda=l1_lambda,
                                             l2_lambda=l2_lambda,
-                                            test_batch_iter_max=predict_batch_iter_max,
+                                            predict_batch_iter_max=predict_batch_iter_max,
                                             epochs=epochs,
                                             loader_method=loader_method,
                                             num_workers=num_workers,
@@ -221,12 +232,14 @@ def train_val_test_pipeline(model_name: str = "GMA",
                                             **kwargs)
     elif model_name == "MLP":
         age_clock = MLPAgeClock(anndata_dir_root=ad_dir_root,
+                                predict_dataset=predict_dataset,
+                                validation_during_training=validation_during_training,
                                 feature_size=feature_size,
                                 batch_size_train=batch_size_train,
                                 train_batch_iter_max=train_batch_iter_max,
                                 batch_size_val=batch_size_val,
                                 batch_size_test=batch_size_test,
-                                test_batch_iter_max=predict_batch_iter_max,
+                                predict_batch_iter_max=predict_batch_iter_max,
                                 epochs=epochs,
                                 loader_method=loader_method,
                                 num_workers=num_workers,
@@ -250,42 +263,43 @@ def train_val_test_pipeline(model_name: str = "GMA",
     print(f"Time elapsed for training: {end_time - start_time} seconds")
 
     ###### plot the training and validation loss values #########
-    if model_name in ["GMA","linear","MLP"]:
-        train_steps = np.arange(len(age_clock.batch_train_loss_list))
-        train_labels = ["train"] * len(age_clock.batch_train_loss_list)
-        val_labels = ["validation"] * len(age_clock.batch_val_loss_list)
-        train_df = pd.DataFrame({"label": train_labels + val_labels,
-                                 "steps": list(train_steps) + list(train_steps),
-                                 loss: age_clock.batch_train_loss_list + age_clock.batch_val_loss_list})
+    if validation_during_training:
+        if model_name in ["GMA","linear","MLP"]:
+            train_steps = np.arange(len(age_clock.batch_train_loss_list))
+            train_labels = ["train"] * len(age_clock.batch_train_loss_list)
+            val_labels = ["validation"] * len(age_clock.batch_val_loss_list)
+            train_df = pd.DataFrame({"label": train_labels + val_labels,
+                                     "steps": list(train_steps) + list(train_steps),
+                                     loss: age_clock.batch_train_loss_list + age_clock.batch_val_loss_list})
 
-        ## save training loss to local file
-        train_df.to_csv(os.path.join(outdir, f"{prefix}_traning_process_{loss}.tsv"),
-                        sep="\t",
-                        index=False)
+            ## save training loss to local file
+            train_df.to_csv(os.path.join(outdir, f"{prefix}_traning_process_{loss}.tsv"),
+                            sep="\t",
+                            index=False)
 
-        # Create a figure for better control over the output
-        plt.figure(figsize=(5, 3))
-        sns.scatterplot(data=train_df, x="steps", y=loss, hue="label")
-        # Adjust layout and legend to prevent clipping
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')  # Legend outside plot
-        plt.tight_layout()
+            # Create a figure for better control over the output
+            plt.figure(figsize=(5, 3))
+            sns.scatterplot(data=train_df, x="steps", y=loss, hue="label")
+            # Adjust layout and legend to prevent clipping
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')  # Legend outside plot
+            plt.tight_layout()
 
-        # Save high-quality image
-        plt.savefig(os.path.join(outdir, f"{prefix}_loss_values_comparison.png"),
-                    dpi=300,  # High resolution
-                    bbox_inches='tight',  # Prevent legend cutoff
-                    transparent=False)  # White background
+            # Save high-quality image
+            plt.savefig(os.path.join(outdir, f"{prefix}_loss_values_comparison.png"),
+                        dpi=300,  # High resolution
+                        bbox_inches='tight',  # Prevent legend cutoff
+                        transparent=False)  # White background
 
-        # Clear the figure to free memory
-        plt.close()
+            # Clear the figure to free memory
+            plt.close()
 
-    if model_name in ["catboost","xgboost"]:
-        eval_metrics_df = age_clock.eval_metrics
-        eval_metrics_df.to_csv(os.path.join(outdir, f"{prefix}_traning_process_{loss}.tsv"),
-                               sep="\t",
-                               index=False)
-        plot_catboost_eval(eval_metrics_df,
-                           save_path=os.path.join(outdir, f"{prefix}_loss_values_comparison.png"))
+        if model_name in ["catboost","xgboost"]:
+            eval_metrics_df = age_clock.eval_metrics
+            eval_metrics_df.to_csv(os.path.join(outdir, f"{prefix}_traning_process_{loss}.tsv"),
+                                   sep="\t",
+                                   index=False)
+            plot_catboost_eval(eval_metrics_df,
+                               save_path=os.path.join(outdir, f"{prefix}_loss_values_comparison.png"))
 
 
     ### saving the model #####
@@ -302,46 +316,46 @@ def train_val_test_pipeline(model_name: str = "GMA",
     else:
         print(f"Warning: only [stat_dict, pkl, joblib, cbm] are supported for model_save_method parameter settings")
 
+    ### model evaluation based on predict_dataset####
+    if model_eval:
+        print(f"datasets used for cell_level_test: {predict_dataset}")
+        cell_level_eval_metrics_dict, y_eval_pred, y_eval_true, soma_ids_all = age_clock.cell_level_test()
+        print(f"cell id check: {soma_ids_all[:3]}")
+        cell_level_m_df = pd.DataFrame(cell_level_eval_metrics_dict, index=[0])
+        cell_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_testing_metrics.tsv"), index=False, sep="\t")
 
-    ### model testing ####
-    cell_level_testing_metrics_dict, y_test_pred, y_test_true, soma_ids_all = age_clock.cell_level_test()
-    print(f"cell id check: {soma_ids_all[:3]}")
-    cell_level_m_df = pd.DataFrame(cell_level_testing_metrics_dict, index=[0])
-    cell_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_testing_metrics.tsv"), index=False, sep="\t")
+        cell_level_eval_df = pd.DataFrame({"y_eval_true": y_eval_true,
+                                           "y_eval_predicted": y_eval_pred,
+                                           "cell_id": soma_ids_all, })
 
-    cell_level_testing_df = pd.DataFrame({"y_test_true": y_test_true,
-                                          "y_test_predicted": y_test_pred,
-                                          "cell_id":soma_ids_all,})
+        cell_level_eval_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_predictions.tsv"),sep="\t")
 
-    cell_level_testing_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_predictions.tsv"),sep="\t")
-
-    donor_true_ages, donor_predicted_ages, donor_level_testing_metrics_dict = donor_level_test(meta_file_path=meta_file_path,
-                                                                           test_soma_joinids=soma_ids_all,
-                                                                           y_test_true=y_test_true,
-                                                                           y_test_predict=y_test_pred,
-                                                                           method="mean")
-
-
-    donor_level_m_df = pd.DataFrame(donor_level_testing_metrics_dict, index=[0])
-    donor_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_testing_metrics.tsv"), index=False, sep="\t")
+        donor_true_ages, donor_predicted_ages, donor_level_eval_metrics_dict = donor_level_test(meta_file_path=meta_file_path,
+                                                                                                test_soma_joinids=soma_ids_all,
+                                                                                                y_test_true=y_eval_true,
+                                                                                                y_test_predict=y_eval_pred,
+                                                                                                method="mean")
 
 
-    donor_level_testing_df = pd.DataFrame({"y_test_true": donor_true_ages,
-                                           "y_test_predicted": donor_predicted_ages})
-
-    donor_level_testing_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_predictions.tsv"),sep="\t")
+        donor_level_m_df = pd.DataFrame(donor_level_eval_metrics_dict, index=[0])
+        donor_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_eval_metrics.tsv"), index=False, sep="\t")
 
 
-    papp(real_age=donor_true_ages.values,
-         predicted_age=donor_predicted_ages.values,
-         outdir=outdir,
-         method_name=model_name,
-         level_type="donor",
-         filename=f"{prefix}_donor_level_evaluation_plot.jpg")
+        donor_level_eval_df = pd.DataFrame({"y_eval_true": donor_true_ages,
+                                               "y_eval_predicted": donor_predicted_ages})
+
+        donor_level_eval_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_predictions.tsv"),sep="\t")
+
+
+        papp(real_age=donor_true_ages.values,
+             predicted_age=donor_predicted_ages.values,
+             outdir=outdir,
+             method_name=model_name,
+             level_type="donor",
+             filename=f"{prefix}_donor_level_evaluation_plot.jpg")
 
 
     #### getting the feature importance #####
-
     if get_feature_importance:
         fi_supported_models = ["xgboost","catboost","GMA"]
         if model_name in fi_supported_models:
