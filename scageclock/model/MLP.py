@@ -12,11 +12,11 @@ import numpy as np
 class MLPAgeClock:
     def __init__(self,
                  anndata_dir_root: str,
-                 dataset_folder_dict=None,
+                 dataset_folder_dict: dict | None = None,
                  feature_size: int = 19031,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
-                 cat_card_list=[14, 219, 39, 3], # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+                 cat_card_list: list | None = None,
                  n_embed: int = 4,
                  var_file_name: str = "h5ad_var.tsv",
                  var_colname: str = "h5ad_var",
@@ -40,6 +40,10 @@ class MLPAgeClock:
                  predict_batch_iter_max: int = 20,
                  device: str = "cpu",
                  log_file: str = "MLPAgeClock_log.txt"):
+        if cat_card_list is None:
+            # ['assay', 'cell_type', 'tissue_general', 'sex'],
+            # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+            cat_card_list = [14, 219, 39, 3]
         if hidden_sizes is None:
             hidden_sizes = [512, 256, 128]  # setting default values for hidden sizes
 

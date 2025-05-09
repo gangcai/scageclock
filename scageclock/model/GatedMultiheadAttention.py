@@ -11,11 +11,11 @@ class GatedMultiheadAttentionAgeClock:
 
     def __init__(self,
                  anndata_dir_root: str,
-                 dataset_folder_dict=None,
+                 dataset_folder_dict: dict | None = None,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
                  feature_size: int = 19031,
-                 cat_card_list=[14, 219, 39, 3],  # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+                 cat_card_list: list[int] | None = None,
                  n_embed: int = 4,
                  var_file_name: str = "h5ad_var.tsv",
                  var_colname: str = "h5ad_var",
@@ -81,6 +81,13 @@ class GatedMultiheadAttentionAgeClock:
         :param initial_model: default None. Load the trained model as the initial model.
         :param log_file: log file
         """
+
+        # default cardinalities for each categorical feature column
+        if cat_card_list is None:
+            # default order of categorical columns: ['assay', 'cell_type', 'tissue_general', 'sex'],
+            # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+            cat_card_list = [14, 219, 39, 3]
+
         # default value for dataset_folder_dict if it is None
         if dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}

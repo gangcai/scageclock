@@ -30,7 +30,7 @@ class XGBoostDataLoader(BasicDataLoader):
                  cell_id: str = "soma_joinid",
                  loader_method: str = "torch",
                  use_cat: bool = False,  # poor performance when setting category type
-                 dataset_folder_dict=None,
+                 dataset_folder_dict: dict | None = None,
                  ):
         if dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
@@ -92,7 +92,7 @@ class XGBoostAgeClock:
 
     def __init__(self,
                  anndata_dir_root: str,
-                 dataset_folder_dict=None,
+                 dataset_folder_dict: dict | None = None,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
                  learning_rate: float = 0.3, # eta values
