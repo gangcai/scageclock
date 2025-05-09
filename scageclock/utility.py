@@ -290,9 +290,9 @@ def extract_individual_cell_type_from_h5ad_files(meta_df,
     return ad_join
 
 
-## format the given single cell expression matrix into the scellage model inputs
+## format the given single cell expression matrix into the scageclock model inputs
 def anndata_formatting(adata,
-                                model_genes,  ## genes used in the ScellAge Model
+                                model_genes,  ## genes used in the scageclock Model
                                 cat_folder,
                                 gene_column="feature_name",
                                 normalize: bool = True,
