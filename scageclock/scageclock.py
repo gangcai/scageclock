@@ -84,35 +84,35 @@ def load_GMA_model(model_file,
         raise ValueError(f"{model_file_type} not supported")
 
 
-# training, evaluation and testing of the model
-def train_eval_test_pipeline(model_name: str = "GMA",
-                             suffix: str = "pb",
-                             run_id: str = "v1",
-                             ad_dir_root: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/",
-                             meta_file_path: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet",
-                             batch_size_train: int = 1024,
-                             train_batch_iter_max: int = 1000,
-                             batch_size_val: int = 10240,
-                             batch_size_test: int = 10240,
-                             l1_lambda: float = 0.01,
-                             l2_lambda: float = 0.01,
-                             test_batch_iter_max: int = 20,
-                             learning_rate: float = 0.001,
-                             nn_weight_decay: float = 0.0001,  # weight decay for neural network
-                             epochs: int = 1,
-                             loader_method: str = "scellage",
-                             num_workers: int = 1,
-                             device: str = "cuda",
-                             loss: str = "MSE",
-                             model_save_method: str = "stat_dict",
-                             # supports one of [stat_dict, pkl, joblib, cbm] , cbm (for catboost)
-                             get_feature_importance: bool = False,
-                             boost_depth: int = 6,
-                             boost_iteration: int = 100,
-                             cat_used_ram_limit: str = "100GB",
-                             cat_n_embed: int = 4, ## number of embedding for the categorical feature, only used in eGMA
-                             **kwargs
-                             ):
+# training, validation and testing of the model
+def train_val_test_pipeline(model_name: str = "GMA",
+                            suffix: str = "pb",
+                            run_id: str = "v1",
+                            ad_dir_root: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/",
+                            meta_file_path: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet",
+                            batch_size_train: int = 1024,
+                            train_batch_iter_max: int = 1000,
+                            batch_size_val: int = 10240,
+                            batch_size_test: int = 10240,
+                            l1_lambda: float = 0.01,
+                            l2_lambda: float = 0.01,
+                            predict_batch_iter_max: int = 20,
+                            learning_rate: float = 0.001,
+                            nn_weight_decay: float = 0.0001,  # weight decay for neural network
+                            epochs: int = 1,
+                            loader_method: str = "scageclock",
+                            num_workers: int = 1,
+                            device: str = "cuda",
+                            loss: str = "MSE",
+                            model_save_method: str = "stat_dict",
+                            # supports one of [stat_dict, pkl, joblib, cbm] , cbm (for catboost)
+                            get_feature_importance: bool = False,
+                            boost_depth: int = 6,
+                            boost_iteration: int = 100,
+                            cat_used_ram_limit: str = "100GB",
+                            cat_n_embed: int = 4,  ## number of embedding for the categorical feature, only used in eGMA
+                            **kwargs
+                            ):
     start_time = time.time()
 
     ## checking the inputs
@@ -155,7 +155,7 @@ def train_eval_test_pipeline(model_name: str = "GMA",
                         batch_size_test=batch_size_test,
                         l1_lambda=l1_lambda,
                         l2_lambda=l2_lambda,
-                        test_batch_iter_max=test_batch_iter_max,
+                        predict_batch_iter_max=predict_batch_iter_max,
                         epochs=epochs,
                         loader_method=loader_method,
                         num_workers=num_workers,
@@ -176,7 +176,7 @@ def train_eval_test_pipeline(model_name: str = "GMA",
                                      train_batch_iter_max=train_batch_iter_max,
                                      batch_size_val=batch_size_val,
                                      batch_size_test=batch_size_test,
-                                     test_batch_iter_max=test_batch_iter_max,
+                                     test_batch_iter_max=predict_batch_iter_max,
                                      task_type=device,
                                      loader_method=loader_method,
                                      learning_rate=learning_rate,
@@ -192,7 +192,7 @@ def train_eval_test_pipeline(model_name: str = "GMA",
                                      train_batch_iter_max=train_batch_iter_max,
                                      batch_size_val=batch_size_val,
                                      batch_size_test=batch_size_test,
-                                     test_batch_iter_max=test_batch_iter_max,
+                                     test_batch_iter_max=predict_batch_iter_max,
                                      device=device,
                                      loader_method=loader_method,
                                      learning_rate=learning_rate,
@@ -210,7 +210,7 @@ def train_eval_test_pipeline(model_name: str = "GMA",
                                             batch_size_test=batch_size_test,
                                             l1_lambda=l1_lambda,
                                             l2_lambda=l2_lambda,
-                                            test_batch_iter_max=test_batch_iter_max,
+                                            test_batch_iter_max=predict_batch_iter_max,
                                             epochs=epochs,
                                             loader_method=loader_method,
                                             num_workers=num_workers,
@@ -226,7 +226,7 @@ def train_eval_test_pipeline(model_name: str = "GMA",
                                 train_batch_iter_max=train_batch_iter_max,
                                 batch_size_val=batch_size_val,
                                 batch_size_test=batch_size_test,
-                                test_batch_iter_max=test_batch_iter_max,
+                                test_batch_iter_max=predict_batch_iter_max,
                                 epochs=epochs,
                                 loader_method=loader_method,
                                 num_workers=num_workers,
@@ -249,7 +249,7 @@ def train_eval_test_pipeline(model_name: str = "GMA",
     end_time = time.time()
     print(f"Time elapsed for training: {end_time - start_time} seconds")
 
-    ###### plot the training loss values #########
+    ###### plot the training and validation loss values #########
     if model_name in ["GMA","linear","MLP"]:
         train_steps = np.arange(len(age_clock.batch_train_loss_list))
         train_labels = ["train"] * len(age_clock.batch_train_loss_list)
