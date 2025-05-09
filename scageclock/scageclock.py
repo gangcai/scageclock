@@ -61,7 +61,7 @@ def get_feature_importance(model):
 
 def load_GMA_model(model_file,
                    model_file_type: str = "pth",
-                   cat_cardinalities=[14, 219, 39, 3],
+                   cat_cardinalities=[14, 219, 39, 3],  # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
                    num_numeric_features: int = 19027,
                    hidden_dim: int = 128,
                    l1_lambda: float = 0.01,
