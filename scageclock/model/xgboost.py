@@ -30,7 +30,10 @@ class XGBoostDataLoader(BasicDataLoader):
                  cell_id: str = "soma_joinid",
                  loader_method: str = "torch",
                  use_cat: bool = False,  # poor performance when setting category type
+                 dataset_folder_dict=None,
                  ):
+        if dataset_folder_dict is None:
+            dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
         # Call the parent class's __init__ method using super()
         super().__init__(anndata_dir_root=anndata_dir_root,
                          var_file_name=var_file_name,
@@ -42,7 +45,8 @@ class XGBoostDataLoader(BasicDataLoader):
                          num_workers=num_workers,
                          age_column=age_column,
                          cell_id=cell_id,
-                         loader_method=loader_method
+                         loader_method=loader_method,
+                         dataset_folder_dict=dataset_folder_dict
                          )
         self.cat_idx_start = cat_idx_start
         self.cat_idx_end = cat_idx_end
@@ -88,6 +92,9 @@ class XGBoostAgeClock:
 
     def __init__(self,
                  anndata_dir_root: str,
+                 dataset_folder_dict=None,
+                 predict_dataset: str = "testing",
+                 validation_during_training: bool = True,
                  learning_rate: float = 0.3, # eta values
                  n_estimators: int = 100, # number of gradient boosted trees. Equivalent to number of boosting rounds.
                  early_stopping_rounds: int = 20, # stop training if no improvements for this number of rounds
@@ -115,12 +122,19 @@ class XGBoostAgeClock:
                  cell_id: str = "soma_joinid",
                  loader_method: str = "torch",
                  train_batch_iter_max: int = 1,  ## maximal number of batch iteration for model training
-                 test_batch_iter_max: int = 20,
+                 predict_batch_iter_max: int = 20,
                  log_file: str = "log.txt",
                  **kwargs
                  ):
+        # default value for dataset_folder_dict if it is None
+        if dataset_folder_dict is None:
+            dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
 
         self.anndata_dir_root = anndata_dir_root
+        self.dataset_folder_dict = dataset_folder_dict
+        self.predict_dataset = predict_dataset
+        self.validation_during_training = validation_during_training
+
         self.learning_rate = learning_rate
 
         self.n_estimators = n_estimators
@@ -150,7 +164,7 @@ class XGBoostAgeClock:
         self.loader_method = loader_method
 
         self.train_batch_iter_max = train_batch_iter_max
-        self.test_batch_iter_max = test_batch_iter_max
+        self.predict_batch_iter_max = predict_batch_iter_max
 
         # Configure logging
         self.log_file = log_file
@@ -169,7 +183,8 @@ class XGBoostAgeClock:
                                             num_workers=self.num_workers,
                                             age_column=self.age_column,
                                             cell_id=self.cell_id,
-                                            loader_method=self.loader_method
+                                            loader_method=self.loader_method,
+                                            dataset_folder_dict=self.dataset_folder_dict
                                             )
 
         ## create XGBoostRegressor model
@@ -206,14 +221,21 @@ class XGBoostAgeClock:
 
             # Train the model on the current batch
             if i == 1:
-                self.model.fit(X_train, y_train, eval_set = [(X_train, y_train), (self.X_val, self.y_val)])
+                if self.validation_during_training:
+                    self.model.fit(X_train, y_train, eval_set=[(X_train, y_train), (self.X_val, self.y_val)])
+                else:
+                    self.model.fit(X_train, y_train)
             else:
-                self.model.fit(X_train, y_train,
-                               eval_set = [(X_train, y_train),(self.X_val, self.y_val)],
-                               xgb_model=self.model.get_booster())
+                if self.validation_during_training:
+                    self.model.fit(X_train, y_train,
+                                   eval_set=[(X_train, y_train), (self.X_val, self.y_val)],
+                                   xgb_model=self.model.get_booster())
+                else:
+                    self.model.fit(X_train, y_train,
+                                   xgb_model=self.model.get_booster())
 
-
-            eval_metrics_list.append(self.model.evals_result_)  ## keep evals_result_ from each model
+            if self.validation_during_training:
+                eval_metrics_list.append(self.model.evals_result_)  ## keep evals_result_ from each model
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Accumulated time cost for {i}: {elapsed_time:.6f} seconds")  # print time relapse
@@ -223,7 +245,8 @@ class XGBoostAgeClock:
                 print(f"Reaching maximal iter number: {self.train_batch_iter_max}")
                 logging.info(f"Reaching maximal iter number: {self.train_batch_iter_max}")
                 break
-        self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
+        if self.validation_during_training:
+            self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
         end_time = time.time()  # End timing
         elapsed_time = end_time - start_time
         print(f"Total time costs: {elapsed_time:.6f} seconds")  # print time relapse
@@ -242,13 +265,30 @@ class XGBoostAgeClock:
         return predictions, targets_all, soma_ids_all
 
     def _predict_basic(self, ):
+        if self.predict_dataset == "testing":
+            if "testing" not in self.dataset_folder_dict:
+                raise ValueError("testing datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_test
+        elif self.predict_dataset == "validation":
+            if "validation" not in self.dataset_folder_dict:
+                raise ValueError("validation datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_val
+        elif self.predict_dataset == "training":
+            if "training" not in self.dataset_folder_dict:
+                raise ValueError("training datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_train
+        else:
+            raise ValueError("supported datasets for prediction: training, testing, and validation")
         predictions = []
         targets_all = []
         soma_ids_all = []
         iter_num = 0
         test_samples_num = 0
-        for i, (features, labels_soma) in enumerate(self.dataloader.dataloader_test, start=1):
-            labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)  ## TODO: double check
+        for i, (features, labels_soma) in enumerate(predict_dataloader, start=1):
+            labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
             X_test, y_test = self.dataloader.get_inputs(X_tensor=features,
                                                           y_tensor=labels)
             outputs = self.model.predict(X_test)
@@ -260,7 +300,7 @@ class XGBoostAgeClock:
             soma_ids_all.extend(soma_ids.numpy())
             test_samples_num += features.size(0)
             iter_num += 1
-            if iter_num >= self.test_batch_iter_max:
+            if iter_num >= self.predict_batch_iter_max:
                 break
 
         return predictions, targets_all, np.array(soma_ids_all).flatten()

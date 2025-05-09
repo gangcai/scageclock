@@ -12,7 +12,10 @@ import numpy as np
 class MLPAgeClock:
     def __init__(self,
                  anndata_dir_root: str,
+                 dataset_folder_dict=None,
                  feature_size: int = 19031,
+                 predict_dataset: str = "testing",
+                 validation_during_training: bool = True,
                  cat_card_list=[14, 219, 39, 3], # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
                  n_embed: int = 4,
                  var_file_name: str = "h5ad_var.tsv",
@@ -24,7 +27,7 @@ class MLPAgeClock:
                  num_workers: int = 10,
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
-                 loader_method: str = "torch",
+                 loader_method: str = "scageclock",
                  hidden_sizes: Optional[List[int]] = None,
                  output_size: int = 1,
                  dropout_prob: float = 0.2,
@@ -34,14 +37,21 @@ class MLPAgeClock:
                  patience: int = 3,
                  scheduler_factor: float = 0.5,
                  train_batch_iter_max: int = 100,  ## maximal number of iteration for the DataLoader during training
-                 test_batch_iter_max: int = 20,
+                 predict_batch_iter_max: int = 20,
                  device: str = "cpu",
                  log_file: str = "MLPAgeClock_log.txt"):
         if hidden_sizes is None:
             hidden_sizes = [512, 256, 128]  # setting default values for hidden sizes
 
+        # default value for dataset_folder_dict if it is None
+        if dataset_folder_dict is None:
+            dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
+
         self.anndata_dir_root = anndata_dir_root
+        self.dataset_folder_dict = dataset_folder_dict
         self.feature_size = feature_size
+        self.predict_dataset = predict_dataset
+        self.validation_during_training = validation_during_training
         self.cat_card_list = cat_card_list
         self.n_embed = n_embed
         self.var_file_name = var_file_name
@@ -64,7 +74,7 @@ class MLPAgeClock:
         self.patience = patience
         self.scheduler_factor = scheduler_factor
         self.train_batch_iter_max = train_batch_iter_max
-        self.test_batch_iter_max = test_batch_iter_max
+        self.predict_batch_iter_max = predict_batch_iter_max
 
         ## training loss metrics
         self.epoch_train_loss_list = []
@@ -87,11 +97,17 @@ class MLPAgeClock:
                                               num_workers=self.num_workers,
                                               age_column=self.age_column,
                                               cell_id=self.cell_id,
-                                              loader_method=self.loader_method
+                                              loader_method=self.loader_method,
+                                              dataset_folder_dict=self.dataset_folder_dict
                                               )
 
-        # sampling one batch from validation datasets for validation checking
-        self.val_X_batch, self.val_y_batch = self.get_val_sample_batch()
+        ## checking for validation
+        if self.validation_during_training:
+            # sampling one batch from validation datasets for validation checking
+            if "validation" in self.dataset_folder_dict:
+                self.val_X_batch, self.val_y_batch = self.get_val_sample_batch()
+            else:
+                raise ValueError("validation datasets is not provided!")
 
         # Initialize the model, loss function, and optimizer
         self.model = MLP(cat_cardinalities=self.cat_card_list,
@@ -197,30 +213,30 @@ class MLPAgeClock:
                     end_time = time.perf_counter()
                     logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (training stage)")
                     logging.info(f"training loss: {loss.item()}")
+                if self.validation_during_training:
+                    ############# evaluation phase for each batch #################
+                    self.model.eval() ## re-set to eval
+                    with torch.no_grad():
+                        targets = self.val_y_batch
+                        inputs = inputs.to(self.device)
+                        outputs = self.model(self.val_X_batch)
+                        targets = targets.to(self.device)
+                        outputs = outputs.squeeze()
+                        targets = targets.squeeze()
+                        targets = targets.to(torch.float32)
+                        loss = self.criterion(outputs, targets)
+                        all_batch_val_loss_list.append(loss.item())
+                        total_val_loss += loss.item() * inputs.size(0)
+                        if iter_num % 100 == 1:
+                            end_time = time.perf_counter()
+                            logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
+                            logging.info(f"validation loss: {loss.item()}")
 
-                ############# evaluation phase for each batch #################
-                self.model.eval() ## re-set to eval
-                with torch.no_grad():
-                    targets = self.val_y_batch
-                    inputs = inputs.to(self.device)
-                    outputs = self.model(self.val_X_batch)
-                    targets = targets.to(self.device)
-                    outputs = outputs.squeeze()
-                    targets = targets.squeeze()
-                    targets = targets.to(torch.float32)
-                    loss = self.criterion(outputs, targets)
-                    all_batch_val_loss_list.append(loss.item())
-                    total_val_loss += loss.item() * inputs.size(0)
-                    if iter_num % 100 == 1:
-                        end_time = time.perf_counter()
-                        logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
-                        logging.info(f"validation loss: {loss.item()}")
-
-                ############### end of the loop when reaching train_batch_iter_max ###############
-                ## it will take too long to fully iterate the whole batches
-                ## only sampling maximal train_batch_iter_max batches for the training process
-                if iter_num >= self.train_batch_iter_max:
-                    break
+                    ############### end of the loop when reaching train_batch_iter_max ###############
+                    ## it will take too long to fully iterate the whole batches
+                    ## only sampling maximal train_batch_iter_max batches for the training process
+                    if iter_num >= self.train_batch_iter_max:
+                        break
             ## end of batch loop
             print(f"training for epoch {epoch} completed, starting model validation")
             logging.info(f"training for epoch {epoch} completed, starting model validation")
@@ -230,20 +246,40 @@ class MLPAgeClock:
             logging.info(f"Epoch {epoch + 1}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
             epoch_train_loss_list.append(avg_train_loss)
 
-            # Calculate average validation loss (use total number of samples)
-            avg_val_loss = total_val_loss / train_samples_num
-            epoch_val_loss_list.append(avg_val_loss)
-            print(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
-            logging.info(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+            if self.validation_during_training:
+                # Calculate average validation loss (use total number of samples)
+                avg_val_loss = total_val_loss / train_samples_num
+                epoch_val_loss_list.append(avg_val_loss)
+                print(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+                logging.info(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
 
-            # Update the learning rate scheduler
-            self.scheduler.step(avg_val_loss)
+                # Update the learning rate scheduler
+                self.scheduler.step(avg_val_loss)
+            else:
+                print("warning: the validation_during_training is set to be False, and the learning rate scheduler is not used.")
         ## end of epoch loop
 
         return epoch_train_loss_list, epoch_val_loss_list, all_batch_train_loss_list, all_batch_val_loss_list
 
     ## making prediction based on the trained MLP model
     def _predict_basic(self, ):
+        if self.predict_dataset == "testing":
+            if "testing" not in self.dataset_folder_dict:
+                raise ValueError("testing datasets is not provided!")
+            else:
+                predict_dataloader = self.MLP_dataloader.dataloader_test
+        elif self.predict_dataset == "validation":
+            if "validation" not in self.dataset_folder_dict:
+                raise ValueError("validation datasets is not provided!")
+            else:
+                predict_dataloader = self.MLP_dataloader.dataloader_val
+        elif self.predict_dataset == "training":
+            if "training" not in self.dataset_folder_dict:
+                raise ValueError("training datasets is not provided!")
+            else:
+                predict_dataloader = self.MLP_dataloader.dataloader_train
+        else:
+            raise ValueError("supported datasets for prediction: training, testing, and validation")
         self.model.eval()
         predictions = []
         targets_all = []
@@ -252,7 +288,7 @@ class MLPAgeClock:
         with torch.no_grad():
             iter_num = 0
             test_samples_num = 0
-            for inputs, labels_soma in self.MLP_dataloader.dataloader_test:
+            for inputs, labels_soma in predict_dataloader:
                 targets, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 outputs = self.model(inputs)
@@ -266,7 +302,7 @@ class MLPAgeClock:
                 soma_ids_all.extend(soma_ids.cpu().numpy())
                 test_samples_num += inputs.size(0)
                 iter_num += 1
-                if iter_num > self.test_batch_iter_max:
+                if iter_num > self.predict_batch_iter_max:
                     break
 
         avg_loss = total_loss / test_samples_num
