@@ -16,10 +16,10 @@ import joblib
 ## load different models
 from .model.GatedMultiheadAttention import GatedMultiheadAttentionAgeClock as GMA
 from .model.GatedMultiheadAttention import GatedMultiheadAttentionFCNet as GMANet
-from .model.catboost import CatBoostAgeClock
-from .model.linear import TorchElasticNetAgeClock
-from .model.mlp import MLPAgeClock
-from .model.xgboost import XGBoostAgeClock
+from .model.CatBoost import CatBoostAgeClock
+from .model.Linear import TorchElasticNetAgeClock
+from .model.MLP import MLPAgeClock
+from .model.XGBoost import XGBoostAgeClock
 
 
 
