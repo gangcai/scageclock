@@ -67,7 +67,7 @@ def plot_age_prediction_performance(real_age: List[float],
 
 def plot_age_prediction_performance_simple(real_age: List[float],
                     predicted_age: List[float],
-                    method_name: str = "SCellAge",
+                    method_name: str = "scageclock",
                     text_x: int = 10,
                     text_y: int = 60,
                     figsize: tuple[int, int] = (10, 6),
