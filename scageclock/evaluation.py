@@ -1,4 +1,4 @@
-from .scageclock import load_GMA_model
+from .scAgeClock import load_GMA_model
 import glob
 import anndata
 import scanpy as sc
