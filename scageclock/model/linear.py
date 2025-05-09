@@ -122,7 +122,7 @@ class TorchElasticNetAgeClock:
 
     # TODO: improve the model saving and loading
     def save(self,
-             saved_model_file_name: str = "scellage_MLP_Model.pth"):
+             saved_model_file_name: str = "scageclock_MLP_Model.pth"):
         torch.save(self.model.state_dict(), saved_model_file_name)
         return True
 
