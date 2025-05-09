@@ -15,7 +15,7 @@ class GatedMultiheadAttentionAgeClock:
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
                  feature_size: int = 19031,
-                 cat_card_list = [14, 219, 39, 3],  # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+                 cat_card_list=[14, 219, 39, 3],  # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
                  n_embed: int = 4,
                  var_file_name: str = "h5ad_var.tsv",
                  var_colname: str = "h5ad_var",
