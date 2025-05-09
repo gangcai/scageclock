@@ -61,7 +61,7 @@ def get_feature_importance(model):
 
 def load_GMA_model(model_file,
                    model_file_type: str = "pth",
-                   cat_cardinalities = [14, 219, 39, 3],
+                   cat_cardinalities=[14, 219, 39, 3],
                    num_numeric_features: int = 19027,
                    hidden_dim: int = 128,
                    l1_lambda: float = 0.01,
@@ -69,11 +69,11 @@ def load_GMA_model(model_file,
                    num_heads: int = 8,):
     if model_file_type == "pth":
         GMA_model = GMANet(cat_cardinalities=cat_cardinalities,
-                            num_numeric_features=num_numeric_features,
-                            hidden_dim=hidden_dim,
-                            l1_lambda=l1_lambda,
-                            l2_lambda=l2_lambda,
-                            num_heads=num_heads)
+                           num_numeric_features=num_numeric_features,
+                           hidden_dim=hidden_dim,
+                           l1_lambda=l1_lambda,
+                           l2_lambda=l2_lambda,
+                           num_heads=num_heads)
         GMA_model.load_state_dict(torch.load(model_file))
         return GMA_model
     elif model_file_type == "pkl":
@@ -84,8 +84,10 @@ def load_GMA_model(model_file,
         raise ValueError(f"{model_file_type} not supported")
 
 
-# training, validation and testing of the model
+# pipeline for model training
 def training_pipeline(model_name: str = "GMA",
+                      dataset_folder_dict=None,
+                      feature_size: int = 19031,
                       suffix: str = "pb",
                       run_id: str = "v1",
                       ad_dir_root: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/",
@@ -118,9 +120,14 @@ def training_pipeline(model_name: str = "GMA",
                       ):
     start_time = time.time()
 
+    # default value for dataset_folder_dict if it is None
+    if dataset_folder_dict is None:
+        dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
+
     ## checking the inputs
-    inputs_checker(ad_dir_root=ad_dir_root,
-                   meta_file_path=meta_file_path)
+    inputs_checker(dataset_folder_dict,
+                   ad_dir_root=ad_dir_root,
+                   meta_file_path=meta_file_path,)
 
     ## checking the models
     available_models = list_available_models(print_model_name=False)
@@ -141,15 +148,11 @@ def training_pipeline(model_name: str = "GMA",
 
     print(f"h5ad file root directory: {ad_dir_root}")
 
-    #get feature size
-    train_ad_files = glob.glob(os.path.join(ad_dir_root, "train/*.h5ad"))
-    ad_example = sc.read_h5ad(train_ad_files[0], backed='r')
-    feature_size = ad_example.shape[1]
-    print(f".h5ad file feature size: {feature_size}")
-
-    # load the age clock model
+    # load the aging clock model
+    print("loading the aging clock model")
     if model_name == "GMA":
         age_clock = GMA(anndata_dir_root=ad_dir_root,
+                        dataset_folder_dict=dataset_folder_dict,
                         predict_dataset=predict_dataset,
                         validation_during_training=validation_during_training,
                         feature_size=feature_size,
@@ -177,6 +180,7 @@ def training_pipeline(model_name: str = "GMA",
         else:
             device = None
         age_clock = CatBoostAgeClock(anndata_dir_root=ad_dir_root,
+                                     dataset_folder_dict=dataset_folder_dict,
                                      predict_dataset=predict_dataset,
                                      validation_during_training=validation_during_training,
                                      batch_size_train=batch_size_train,
@@ -195,6 +199,7 @@ def training_pipeline(model_name: str = "GMA",
                                      )
     elif model_name == "xgboost":
         age_clock = XGBoostAgeClock(anndata_dir_root=ad_dir_root,
+                                    dataset_folder_dict=dataset_folder_dict,
                                     predict_dataset=predict_dataset,
                                     validation_during_training=validation_during_training,
                                     batch_size_train=batch_size_train,
@@ -212,6 +217,7 @@ def training_pipeline(model_name: str = "GMA",
                                     )
     elif model_name == "linear":
         age_clock = TorchElasticNetAgeClock(anndata_dir_root=ad_dir_root,
+                                            dataset_folder_dict=dataset_folder_dict,
                                             predict_dataset=predict_dataset,
                                             validation_during_training=validation_during_training,
                                             feature_size=feature_size,
@@ -232,6 +238,7 @@ def training_pipeline(model_name: str = "GMA",
                                             **kwargs)
     elif model_name == "MLP":
         age_clock = MLPAgeClock(anndata_dir_root=ad_dir_root,
+                                dataset_folder_dict=dataset_folder_dict,
                                 predict_dataset=predict_dataset,
                                 validation_during_training=validation_during_training,
                                 feature_size=feature_size,
@@ -264,6 +271,7 @@ def training_pipeline(model_name: str = "GMA",
 
     ###### plot the training and validation loss values #########
     if validation_during_training:
+        print("start training loss values generation on training datasets and validation datasets")
         if model_name in ["GMA","linear","MLP"]:
             train_steps = np.arange(len(age_clock.batch_train_loss_list))
             train_labels = ["train"] * len(age_clock.batch_train_loss_list)
@@ -303,6 +311,7 @@ def training_pipeline(model_name: str = "GMA",
 
 
     ### saving the model #####
+    print("start saving the model")
     if model_save_method == "stat_dict":
         saved_model_file_name = os.path.join(outdir, prefix + ".pth")
         torch.save(age_clock.model.state_dict(), saved_model_file_name)
@@ -318,6 +327,7 @@ def training_pipeline(model_name: str = "GMA",
 
     ### model evaluation based on predict_dataset####
     if model_eval:
+        print("start model evaluation")
         print(f"datasets used for cell_level_test: {predict_dataset}")
         cell_level_eval_metrics_dict, y_eval_pred, y_eval_true, soma_ids_all = age_clock.cell_level_test()
         print(f"cell id check: {soma_ids_all[:3]}")
@@ -357,6 +367,7 @@ def training_pipeline(model_name: str = "GMA",
 
     #### getting the feature importance #####
     if get_feature_importance:
+        print("start feature importance calculation")
         fi_supported_models = ["xgboost","catboost","GMA"]
         if model_name in fi_supported_models:
             feature_importances = age_clock.get_feature_importance()
@@ -371,6 +382,7 @@ def training_pipeline(model_name: str = "GMA",
             print(f"feature importance only support {fi_supported_models}")
 
     end_time = time.time()
+    print("Training completed!")
     print(f"Time elapsed for the whole pipeline: {end_time - start_time} seconds")
 
 def list_available_models(print_model_name=True):
@@ -380,10 +392,11 @@ def list_available_models(print_model_name=True):
 
     return available_models
 
-def inputs_checker(ad_dir_root,
+def inputs_checker(dataset_folder_dict,
+                   ad_dir_root,
                    meta_file_path):
     # check the existence of the folders and files
-    for sub_folder in ["test", "train", "val"]:
+    for sub_folder in dataset_folder_dict.values():
         if not os.path.exists(os.path.join(ad_dir_root, sub_folder)):
             raise ValueError(f"sub folder not exist in the inputs root directory: {sub_folder}!")
         sub_folder_h5ad_files = glob.glob(os.path.join(ad_dir_root, f"{sub_folder}/*.h5ad"))
