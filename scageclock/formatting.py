@@ -56,7 +56,7 @@ def update_anndata_with_missing_genes(adata, gene_list):
 # cat_folder:
 # /home/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/categorical_numeric_index
 def format_anndata(adata_raw,
-                   model_genes,  ## genes used in the ScellAge Model
+                   model_genes,  ## genes used in the scageclock Model
                    cat_folder,
                    gene_column="feature_name",
                    normalize: bool = True,
