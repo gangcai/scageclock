@@ -28,7 +28,7 @@ class CatBoostDataLoader(BasicDataLoader):
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
                  loader_method: str = "torch",
-                 dataset_folder_dict = None,):
+                 dataset_folder_dict: dict | None = None,):
         if dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
         # Call the parent class's __init__ method using super()
@@ -67,7 +67,7 @@ class CatBoostAgeClock:
 
     def __init__(self,
                  anndata_dir_root: str,
-                 dataset_folder_dict=None,
+                 dataset_folder_dict: dict | None = None,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
                  iterations: int = 100,
