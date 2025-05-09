@@ -1,5 +1,4 @@
 import os
-import scanpy as sc
 import glob
 import numpy as np
 import pandas as pd
@@ -22,74 +21,8 @@ from .model.MLP import MLPAgeClock
 from .model.XGBoost import XGBoostAgeClock
 
 
-
-## given a single cell matrix inputs (numpy array or tensor), predict the donor/individual age of the cells
-# TODO: optimize
-def predict(model,
-            inputs,
-            device='cpu'):
-
-    if not device in ['cpu',"cuda"]:
-        raise ValueError(f"only two devices supported: cpu or cuda")
-
-    if not (isinstance(inputs, np.ndarray) or isinstance(inputs, torch.Tensor)):
-        raise  ValueError("inputs type should be either of numpy.ndarray or torch.Tensor")
-
-    model_device_name = check_model_device(model)
-    if isinstance(inputs,np.ndarray):
-        inputs = torch.tensor(inputs)
-
-    inputs_device_name = check_tensor_device(inputs)
-
-    if (device == 'cpu') and (model_device_name == 'cuda'):
-        model = model.cpu()
-    elif (device == 'cuda') and (model_device_name == 'cpu'):
-        model = model.to("cuda")
-
-    if (device == 'cpu') and (inputs_device_name == 'cuda'):
-        inputs = inputs.cpu()
-    elif (device == 'cuda') and (inputs_device_name == 'cpu'):
-        inputs = inputs.to("cuda")
-
-    age_predicted = model(inputs)
-    return age_predicted.squeeze().detach()
-
-
-def get_feature_importance(model):
-    return model.get_feature_importance()
-
-
-def load_GMA_model(model_file,
-                   model_file_type: str = "pth",
-                   cat_cardinalities: list[int] | None = None,
-                   num_numeric_features: int = 19027,
-                   hidden_dim: int = 128,
-                   l1_lambda: float = 0.01,
-                   l2_lambda: float = 0,
-                   num_heads: int = 8,):
-    if cat_cardinalities is None:
-        # ['assay', 'cell_type', 'tissue_general', 'sex'],
-        # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
-        cat_cardinalities = [14, 219, 39, 3]
-
-    if model_file_type == "pth":
-        GMA_model = GMANet(cat_cardinalities=cat_cardinalities,
-                           num_numeric_features=num_numeric_features,
-                           hidden_dim=hidden_dim,
-                           l1_lambda=l1_lambda,
-                           l2_lambda=l2_lambda,
-                           num_heads=num_heads)
-        GMA_model.load_state_dict(torch.load(model_file))
-        return GMA_model
-    elif model_file_type == "pkl":
-        with open(model_file, 'rb') as file:  # 'rb' stands for read binary
-            GMA_model = pickle.load(file)
-        return GMA_model
-    else:
-        raise ValueError(f"{model_file_type} not supported")
-
-
 # pipeline for model training
+# TODO: optimize ad_dir_root and meta_file_path default settings
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
                       feature_size: int = 19031,
@@ -389,6 +322,71 @@ def training_pipeline(model_name: str = "GMA",
     end_time = time.time()
     print("Training completed!")
     print(f"Time elapsed for the whole pipeline: {end_time - start_time} seconds")
+
+## given a single cell matrix inputs (numpy array or tensor), predict the donor/individual age of the cells
+# TODO: optimize
+def predict(model,
+            inputs,
+            device='cpu'):
+
+    if not device in ['cpu',"cuda"]:
+        raise ValueError(f"only two devices supported: cpu or cuda")
+
+    if not (isinstance(inputs, np.ndarray) or isinstance(inputs, torch.Tensor)):
+        raise  ValueError("inputs type should be either of numpy.ndarray or torch.Tensor")
+
+    model_device_name = check_model_device(model)
+    if isinstance(inputs,np.ndarray):
+        inputs = torch.tensor(inputs)
+
+    inputs_device_name = check_tensor_device(inputs)
+
+    if (device == 'cpu') and (model_device_name == 'cuda'):
+        model = model.cpu()
+    elif (device == 'cuda') and (model_device_name == 'cpu'):
+        model = model.to("cuda")
+
+    if (device == 'cpu') and (inputs_device_name == 'cuda'):
+        inputs = inputs.cpu()
+    elif (device == 'cuda') and (inputs_device_name == 'cpu'):
+        inputs = inputs.to("cuda")
+
+    age_predicted = model(inputs)
+    return age_predicted.squeeze().detach()
+
+
+def get_feature_importance(model):
+    return model.get_feature_importance()
+
+
+def load_GMA_model(model_file,
+                   model_file_type: str = "pth",
+                   cat_cardinalities: list[int] | None = None,
+                   num_numeric_features: int = 19027,
+                   hidden_dim: int = 128,
+                   l1_lambda: float = 0.01,
+                   l2_lambda: float = 0,
+                   num_heads: int = 8,):
+    if cat_cardinalities is None:
+        # ['assay', 'cell_type', 'tissue_general', 'sex'],
+        # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+        cat_cardinalities = [14, 219, 39, 3]
+
+    if model_file_type == "pth":
+        GMA_model = GMANet(cat_cardinalities=cat_cardinalities,
+                           num_numeric_features=num_numeric_features,
+                           hidden_dim=hidden_dim,
+                           l1_lambda=l1_lambda,
+                           l2_lambda=l2_lambda,
+                           num_heads=num_heads)
+        GMA_model.load_state_dict(torch.load(model_file))
+        return GMA_model
+    elif model_file_type == "pkl":
+        with open(model_file, 'rb') as file:  # 'rb' stands for read binary
+            GMA_model = pickle.load(file)
+        return GMA_model
+    else:
+        raise ValueError(f"{model_file_type} not supported")
 
 def list_available_models(print_model_name=True):
     available_models = ["linear", "xgboost", "catboost", "MLP", "GMA"]
