@@ -27,8 +27,10 @@ class CatBoostDataLoader(BasicDataLoader):
                  cat_idx_end: int = 4,
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
-                 loader_method: str = "torch"
-                 ):
+                 loader_method: str = "torch",
+                 dataset_folder_dict = None,):
+        if dataset_folder_dict is None:
+            dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
         # Call the parent class's __init__ method using super()
         super().__init__(anndata_dir_root=anndata_dir_root,
                          var_file_name=var_file_name,
@@ -40,7 +42,8 @@ class CatBoostDataLoader(BasicDataLoader):
                          num_workers=num_workers,
                          age_column=age_column,
                          cell_id=cell_id,
-                         loader_method=loader_method
+                         loader_method=loader_method,
+                         dataset_folder_dict=dataset_folder_dict
                          )
         self.cat_idx_start = cat_idx_start
         self.cat_idx_end = cat_idx_end
@@ -64,6 +67,9 @@ class CatBoostAgeClock:
 
     def __init__(self,
                  anndata_dir_root: str,
+                 dataset_folder_dict=None,
+                 predict_dataset: str = "testing",
+                 validation_during_training: bool = True,
                  iterations: int = 100,
                  learning_rate: float = 0.1,
                  depth: int = 6,
@@ -89,12 +95,20 @@ class CatBoostAgeClock:
                  cell_id: str = "soma_joinid",
                  loader_method: str = "torch",
                  train_batch_iter_max: int = 1,  ## maximal number of batch iteration for model training
-                 test_batch_iter_max: int = 20,
+                 predict_batch_iter_max: int = 20,
                  log_file: str = "log.txt",
                  **kwargs
                  ):
 
+        # default value for dataset_folder_dict if it is None
+        if dataset_folder_dict is None:
+            dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
+
         self.anndata_dir_root = anndata_dir_root
+        self.dataset_folder_dict = dataset_folder_dict
+        self.predict_dataset = predict_dataset
+        self.validation_during_training = validation_during_training
+
         self.iterations = iterations
         self.learning_rate = learning_rate
         self.depth = depth
@@ -121,6 +135,7 @@ class CatBoostAgeClock:
         self.loader_method = loader_method
         self.train_batch_iter_max = train_batch_iter_max
 
+
         # Configure logging
         self.log_file = log_file
         logging.basicConfig(filename=self.log_file, level=logging.INFO)
@@ -138,7 +153,8 @@ class CatBoostAgeClock:
                                              num_workers=self.num_workers,
                                              age_column=self.age_column,
                                              cell_id=self.cell_id,
-                                             loader_method=self.loader_method
+                                             loader_method=self.loader_method,
+                                             dataset_folder_dict=self.dataset_folder_dict
                                              )
 
         ## create CatBoostRegressor model
@@ -157,7 +173,7 @@ class CatBoostAgeClock:
                                        **kwargs)
 
         self.train_batch_iter_max = train_batch_iter_max
-        self.test_batch_iter_max = test_batch_iter_max
+        self.predict_batch_iter_max = predict_batch_iter_max
 
         self.val_pool, self.val_soma_ids = self._get_val_pool()
         self.eval_metrics = None
@@ -172,9 +188,14 @@ class CatBoostAgeClock:
             labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1) ## TODO: double check
             train_pool = self.dataloader.get_pool_data(X_tensor=features,
                                                        y_tensor=labels)
-            self.model.fit(train_pool, eval_set=self.val_pool, init_model=init_model, verbose=10)
+            if self.validation_during_training:
+                self.model.fit(train_pool, eval_set=self.val_pool, init_model=init_model, verbose=10)
+            else:
+                print("warning: no validation data")
+                self.model.fit(train_pool,  init_model=init_model, verbose=10)
             init_model = self.model  # update the model
-            eval_metrics_list.append(self.model.evals_result_) ## keep evals_result_ from each model
+            if self.validation_during_training:
+                eval_metrics_list.append(self.model.evals_result_) ## keep evals_result_ from each model
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Accumulated time cost for iteration {i}: {elapsed_time:.6f} seconds")  # print time relapse
@@ -183,7 +204,8 @@ class CatBoostAgeClock:
                 print(f"Reaching maximal iter number: {self.train_batch_iter_max}")
                 logging.info(f"Reaching maximal iter number: {self.train_batch_iter_max}")
                 break
-        self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
+        if self.validation_during_training:
+            self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
         end_time = time.time()  # End timing
         elapsed_time = end_time - start_time
         print(f"Total time costs: {elapsed_time:.6f} seconds")  # print time relapse
@@ -215,13 +237,30 @@ class CatBoostAgeClock:
         return val_pool, soma_ids
 
     def _predict_basic(self, ):
+        if self.predict_dataset == "testing":
+            if "testing" not in self.dataset_folder_dict:
+                raise ValueError("testing datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_test
+        elif self.predict_dataset == "validation":
+            if "validation" not in self.dataset_folder_dict:
+                raise ValueError("validation datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_val
+        elif self.predict_dataset == "training":
+            if "training" not in self.dataset_folder_dict:
+                raise ValueError("training datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_train
+        else:
+            raise ValueError("supported datasets for prediction: training, testing, and validation")
         predictions = []
         targets_all = []
         soma_ids_all = []
         iter_num = 0
         test_samples_num = 0
-        for inputs, labels_soma in self.dataloader.dataloader_test:
-            labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)  ## TODO: double check
+        for inputs, labels_soma in predict_dataloader:
+            labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
             test_pool = self.dataloader.get_pool_data(X_tensor=inputs,
                                                        y_tensor=labels)
             outputs = self.model.predict(test_pool)
@@ -233,7 +272,7 @@ class CatBoostAgeClock:
             soma_ids_all.extend(soma_ids.numpy())
             test_samples_num += inputs.size(0)
             iter_num += 1
-            if iter_num >= self.test_batch_iter_max:
+            if iter_num >= self.predict_batch_iter_max:
                 break
 
         return predictions, targets_all, np.array(soma_ids_all).flatten()
