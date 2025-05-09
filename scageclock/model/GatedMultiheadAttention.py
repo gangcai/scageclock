@@ -11,8 +11,11 @@ class GatedMultiheadAttentionAgeClock:
 
     def __init__(self,
                  anndata_dir_root: str,
+                 dataset_folder_dict=None,
+                 predict_dataset: str = "testing",
+                 validation_during_training: bool = True,
                  feature_size: int = 19031,
-                 cat_card_list = [14, 219, 39, 3], # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+                 cat_card_list = [14, 219, 39, 3],  # ['assay', 'cell_type', 'tissue_general', 'sex'], the cardinalities for each categorical feature column, the first len(cat_car_list) columns
                  n_embed: int = 4,
                  var_file_name: str = "h5ad_var.tsv",
                  var_colname: str = "h5ad_var",
@@ -23,7 +26,7 @@ class GatedMultiheadAttentionAgeClock:
                  num_workers: int = 10,
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
-                 loader_method: str = "scellage",
+                 loader_method: str = "scageclock",
                  l1_lambda: float = 0.01,
                  l2_lambda: float = 0,
                  dropout_prob: float = 0.2,
@@ -36,14 +39,17 @@ class GatedMultiheadAttentionAgeClock:
                  num_heads: int = 8,
                  device: str = "cpu",
                  train_batch_iter_max: int = 100,  ## maximal number of iteration for the DataLoader during training
-                 test_batch_iter_max: int = 20,
+                 predict_batch_iter_max: int = 20,
                  initial_model: str | None = None,
-                 cat_feature_importance_method: str = "max", # max, mean, sum
+                 cat_feature_importance_method: str = "max",  # max, mean, sum
                  log_file: str = "log.txt"):
         """
         Aging Clock based on Gated (Elastic Net) Multi-head Attention Neural Network
 
         :param anndata_dir_root: root directory that stores model datasets:  h5ad_var.tsv  test/*.h5ad  train/*.h5ad  val/*.h5ad
+        :param dataset_folder_dict: the folder name for each type of datasets, default: {"training": "train", "validation": "val", "testing": "test"}
+        :param predict_dataset: datasets used for making prediction ,  'validation' or 'testing' (default) or 'training' datasets
+        :param validation_during_training: boolean value whether to do validation during training processes, if true, validation loss is recorded during each training batch
         :param feature_size: number of features (categorical features + numeric gene features)
         :param cat_card_list: number of cardinalities for each categorical feature
         :param n_embed: dimension size of the embedding for the categorical feature
@@ -56,7 +62,7 @@ class GatedMultiheadAttentionAgeClock:
         :param num_workers: number of parallel jobs for Data Loading
         :param age_column: age column name in the adata.obs
         :param cell_id:cell id column name in the adata.obs # default using CELLxGENE soma_joinid
-        :param loader_method: loader method used: "torch" or "scellage"
+        :param loader_method: loader method used: "torch" or "scageclock"
         :param l1_lambda: L1 regularization parameter
         :param l2_lambda: L2 regularization parameter
         :param dropout_prob: dropout probability
@@ -71,11 +77,18 @@ class GatedMultiheadAttentionAgeClock:
         :param num_heads: number of heads for Multi-head Attention
         :param device: device used for training: cpu , cuda
         :param train_batch_iter_max: early stop of batch iteration when reaching this number of batches for the training processes
-        :param test_batch_iter_max: early stop of batch iteration when reaching this number of batches for the testing processes
+        :param predict_batch_iter_max: early stop of batch iteration when reaching this number of batches for the prediction processes
         :param initial_model: default None. Load the trained model as the initial model.
         :param log_file: log file
         """
+        # default value for dataset_folder_dict if it is None
+        if dataset_folder_dict is None:
+            dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
+
         self.anndata_dir_root = anndata_dir_root
+        self.dataset_folder_dict = dataset_folder_dict
+        self.predict_dataset = predict_dataset
+        self.validation_during_training = validation_during_training
         self.feature_size = feature_size
         self.cat_card_list = cat_card_list
         self.n_embed = n_embed
@@ -102,7 +115,7 @@ class GatedMultiheadAttentionAgeClock:
         self.device = device
         self.input_dim = self.feature_size # set input dim as feature size
         self.train_batch_iter_max = train_batch_iter_max
-        self.test_batch_iter_max = test_batch_iter_max
+        self.predict_batch_iter_max = predict_batch_iter_max
 
         self.cat_feature_importance_method = cat_feature_importance_method
 
@@ -128,12 +141,18 @@ class GatedMultiheadAttentionAgeClock:
                                           num_workers=self.num_workers,
                                           age_column=self.age_column,
                                           cell_id=self.cell_id,
-                                          loader_method=self.loader_method
+                                          loader_method=self.loader_method,
+                                          dataset_folder_dict=self.dataset_folder_dict
                                           )
 
 
-        # sampling one batch from validation datasets for validation checking
-        self.val_X_batch, self.val_y_batch = self.get_val_sample_batch()
+        ## checking for validation
+        if self.validation_during_training:
+            # sampling one batch from validation datasets for validation checking
+            if "validation" in self.dataset_folder_dict:
+                self.val_X_batch, self.val_y_batch = self.get_val_sample_batch()
+            else:
+                raise ValueError("validation datasets is not provided!")
 
 
         # Initialize the model, loss function, and optimizer
@@ -164,8 +183,10 @@ class GatedMultiheadAttentionAgeClock:
 
 
     def train(self):
+
         (self.epoch_train_loss_list, self.epoch_val_loss_list,
-         self.batch_train_loss_list, self.batch_val_loss_list) = self._train_basic_batch_level_validation()
+             self.batch_train_loss_list, self.batch_val_loss_list) = self._train_basic_batch_level_validation()
+
         return True
 
     ## test the age prediction performance at single cell level
@@ -198,10 +219,10 @@ class GatedMultiheadAttentionAgeClock:
     def _train_basic_batch_level_validation(self):
         ## loss value for each epoch
         epoch_train_loss_list = []
-        epoch_val_loss_list = []
-
         ## loss value for each batch in each epoch
         all_batch_train_loss_list = []
+
+        epoch_val_loss_list = []
         all_batch_val_loss_list = []
 
         start_time = time.perf_counter()
@@ -241,29 +262,30 @@ class GatedMultiheadAttentionAgeClock:
                     logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (training stage)")
                     logging.info(f"training loss: {loss.item()}")
 
-                ############# evaluation phase for each batch #################
-                self.model.eval() ## re-set to eval
-                with torch.no_grad():
-                    targets = self.val_y_batch
-                    inputs = inputs.to(self.device)
-                    outputs = self.model(self.val_X_batch)
-                    targets = targets.to(self.device)
-                    outputs = outputs.squeeze()
-                    targets = targets.squeeze()
-                    targets = targets.to(torch.float32)
-                    loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
-                    all_batch_val_loss_list.append(loss.item())
-                    total_val_loss += loss.item() * inputs.size(0)
-                    if iter_num % 100 == 1:
-                        end_time = time.perf_counter()
-                        logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
-                        logging.info(f"validation loss: {loss.item()}")
+                if self.validation_during_training:
+                    ############# validation phase for each batch #################
+                    self.model.eval() ## re-set to eval
+                    with torch.no_grad():
+                        targets = self.val_y_batch
+                        inputs = inputs.to(self.device)
+                        outputs = self.model(self.val_X_batch)
+                        targets = targets.to(self.device)
+                        outputs = outputs.squeeze()
+                        targets = targets.squeeze()
+                        targets = targets.to(torch.float32)
+                        loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
+                        all_batch_val_loss_list.append(loss.item())
+                        total_val_loss += loss.item() * inputs.size(0)
+                        if iter_num % 100 == 1:
+                            end_time = time.perf_counter()
+                            logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
+                            logging.info(f"validation loss: {loss.item()}")
 
-                ############### end of the loop when reaching train_batch_iter_max ###############
-                ## it will take too long to fully iterate the whole batches
-                ## only sampling maximal train_batch_iter_max batches for the training process
-                if iter_num >= self.train_batch_iter_max:
-                    break
+                    ############### end of the loop when reaching train_batch_iter_max ###############
+                    ## it will take too long to fully iterate the whole batches
+                    ## only sampling maximal train_batch_iter_max batches for the training process
+                    if iter_num >= self.train_batch_iter_max:
+                        break
             ## end of batch loop
             print(f"training for epoch {epoch} completed")
             print(f"iter_num: {iter_num}")
@@ -275,29 +297,50 @@ class GatedMultiheadAttentionAgeClock:
             logging.info(f"Epoch {epoch + 1}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
             epoch_train_loss_list.append(avg_train_loss)
 
-            # Calculate average validation loss (use total number of samples)
-            avg_val_loss = total_val_loss / train_samples_num
-            epoch_val_loss_list.append(avg_val_loss)
-            print(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
-            logging.info(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+            if self.validation_during_training:
+                # Calculate average validation loss (use total number of samples)
+                avg_val_loss = total_val_loss / train_samples_num
+                epoch_val_loss_list.append(avg_val_loss)
+                print(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+                logging.info(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
 
-            # Update the learning rate scheduler
-            self.scheduler.step(avg_val_loss)
+                # Update the learning rate scheduler
+                self.scheduler.step(avg_val_loss)
+            else:
+                print("warning: the validation_during_training is set to be False, and the learning rate scheduler is not used.")
         ## end of epoch loop
 
         return epoch_train_loss_list, epoch_val_loss_list, all_batch_train_loss_list, all_batch_val_loss_list
 
-    ## making prediction based on the trained MLP model
     def _predict_basic(self, ):
+        if self.predict_dataset == "testing":
+            if "testing" not in self.dataset_folder_dict:
+                raise ValueError("testing datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_test
+        elif self.predict_dataset == "validation":
+            if "validation" not in self.dataset_folder_dict:
+                raise ValueError("validation datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_val
+        elif self.predict_dataset == "training":
+            if "training" not in self.dataset_folder_dict:
+                raise ValueError("training datasets is not provided!")
+            else:
+                predict_dataloader = self.dataloader.dataloader_train
+        else:
+            raise ValueError("supported datasets for prediction: training, testing, and validation")
+
         self.model.eval()
         predictions = []
         targets_all = []
         soma_ids_all = []
         total_loss = 0
+
         with torch.no_grad():
             iter_num = 0
             test_samples_num = 0
-            for inputs, labels_soma in self.dataloader.dataloader_test:
+            for inputs, labels_soma in predict_dataloader:
                 targets, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 outputs = self.model(inputs)
@@ -311,7 +354,7 @@ class GatedMultiheadAttentionAgeClock:
                 soma_ids_all.extend(soma_ids.cpu().numpy())
                 test_samples_num += inputs.size(0)
                 iter_num += 1
-                if iter_num >= self.test_batch_iter_max:
+                if iter_num >= self.predict_batch_iter_max:
                     break
 
         avg_loss = total_loss / test_samples_num
