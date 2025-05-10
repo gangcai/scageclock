@@ -133,6 +133,8 @@ def check_tensor_device(inputs):
     else:
         return False
 
+
+### TODO: delete extract function for h5ad files, moved to h5ad_sampler
 ## extract for a given cell type anndata from a list of h5ad files
 ## Those .h5ad files should contain the similar structure of .obs and .var
 def extract_cell_type_data_from_h5ad_files(meta_df,
