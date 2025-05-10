@@ -23,13 +23,15 @@ from .model.XGBoost import XGBoostAgeClock
 
 # pipeline for model training
 # TODO: optimize ad_dir_root and meta_file_path default settings
+# /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/
+# /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
                       feature_size: int = 19031,
                       suffix: str = "pb",
                       run_id: str = "v1",
-                      ad_dir_root: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/",
-                      meta_file_path: str = "/mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet",
+                      ad_dir_root: str = "./db/",
+                      meta_file_path: str = "./db/",
                       predict_dataset: str = "validation",
                       model_eval: bool = True, ## whether to evaluation of the model, such as based on validation datasets or testing datasets
                       validation_during_training: bool = True,
