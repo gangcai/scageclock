@@ -1,17 +1,14 @@
 import pandas as pd
 import numpy as np
-
 from xgboost import XGBRegressor
 import xgboost as xgb
-
 import time
-
 from ..utility import get_validation_metrics
-
 import torch
 from ..dataloader import BasicDataLoader
 import logging
-
+from ..h5ad_dataloader import fully_loaded
+import os
 
 
 class XGBoostDataLoader(BasicDataLoader):
@@ -28,7 +25,7 @@ class XGBoostDataLoader(BasicDataLoader):
                  cat_idx_end: int = 4, # not used
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
-                 loader_method: str = "torch",
+                 loader_method: str = "scageclock",
                  use_cat: bool = False,  # poor performance when setting category type
                  dataset_folder_dict: dict | None = None,
                  ):
@@ -52,37 +49,37 @@ class XGBoostDataLoader(BasicDataLoader):
         self.cat_idx_end = cat_idx_end
         self.use_cat = use_cat
 
-    ## get XGBoost DMatrix data
-    def get_DMatrix(self,
-                      X_tensor,
-                      y_tensor):
-        X_df = pd.DataFrame(X_tensor, columns=list(self.var_df[self.var_colname]))
-        y = np.array(y_tensor)
-
-        if self.use_cat:
-            columns = X_df.columns
-            categorical_cols = list(columns[self.cat_idx_start:self.cat_idx_end])
-            # convert categorical value to category type
-            X_df[categorical_cols] = X_df[categorical_cols].astype("category")
-            d_matrix = xgb.DMatrix(X_df, label=y, feature_names=list(self.var_df[self.var_colname]), enable_categorical=True)
-            return d_matrix
-        else:
-            d_matrix = xgb.DMatrix(X_df, label=y, feature_names=list(self.var_df[self.var_colname]), enable_categorical=False)
-            return d_matrix
+    # ## get XGBoost DMatrix data
+    # def get_DMatrix(self,
+    #                   X_tensor,
+    #                   y_tensor):
+    #     X_df = pd.DataFrame(X_tensor, columns=list(self.var_df[self.var_colname]))
+    #     y = np.array(y_tensor)
+    #
+    #     if self.use_cat:
+    #         columns = X_df.columns
+    #         categorical_cols = list(columns[self.cat_idx_start:self.cat_idx_end])
+    #         # convert categorical value to category type
+    #         X_df[categorical_cols] = X_df[categorical_cols].astype("category")
+    #         d_matrix = xgb.DMatrix(X_df, label=y, feature_names=list(self.var_df[self.var_colname]), enable_categorical=True)
+    #         return d_matrix
+    #     else:
+    #         d_matrix = xgb.DMatrix(X_df, label=y, feature_names=list(self.var_df[self.var_colname]), enable_categorical=False)
+    #         return d_matrix
 
     def get_inputs(self,
-                   X_tensor,
-                   y_tensor):
-        X = pd.DataFrame(X_tensor, columns=list(self.var_df[self.var_colname]))
+                   X,
+                   y):
+        X = pd.DataFrame(X, columns=list(self.var_df[self.var_colname]))
 
         if self.use_cat:
             columns = X.columns
             categorical_cols = list(columns[self.cat_idx_start:self.cat_idx_end])
             # convert categorical value to category type
             X[categorical_cols] = X[categorical_cols].astype("category")
-            y = np.array(y_tensor)
+            y = np.array(y)
         else:
-            y = np.array(y_tensor)
+            y = np.array(y)
 
         return X, y
 
@@ -93,7 +90,7 @@ class XGBoostAgeClock:
     def __init__(self,
                  anndata_dir_root: str,
                  dataset_folder_dict: dict | None = None,
-                 predict_dataset: str = "testing",
+                 predict_dataset: str = "validation",
                  validation_during_training: bool = True,
                  learning_rate: float = 0.3, # eta values
                  n_estimators: int = 100, # number of gradient boosted trees. Equivalent to number of boosting rounds.
@@ -120,7 +117,12 @@ class XGBoostAgeClock:
                  n_jobs: int = 10, # for XGBRegressor n_jobs
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
-                 loader_method: str = "torch",
+                 loader_method: str = "scageclock",
+                 train_dataset_fully_loaded: bool = False,
+                 ## load all .h5ad training files into memory and concatenate into one anndata
+                 predict_dataset_fully_loaded: bool = False,
+                 ## load all .h5ad prediction files into memory and concatenate into one anndata
+                 validation_dataset_fully_loaded: bool = False,
                  train_batch_iter_max: int = 1,  ## maximal number of batch iteration for model training
                  predict_batch_iter_max: int = 20,
                  log_file: str = "log.txt",
@@ -162,6 +164,9 @@ class XGBoostAgeClock:
         self.age_column = age_column
         self.cell_id = cell_id
         self.loader_method = loader_method
+        self.train_dataset_fully_loaded = train_dataset_fully_loaded
+        self.predict_dataset_fully_loaded = predict_dataset_fully_loaded
+        self.validation_dataset_fully_loaded = validation_dataset_fully_loaded
 
         self.train_batch_iter_max = train_batch_iter_max
         self.predict_batch_iter_max = predict_batch_iter_max
@@ -170,7 +175,7 @@ class XGBoostAgeClock:
         self.log_file = log_file
         logging.basicConfig(filename=self.log_file, level=logging.INFO)
 
-        ## loading the data
+        ## loading the data (lazy loaded, without loading all into memory)
         self.dataloader = XGBoostDataLoader(anndata_dir_root=self.anndata_dir_root,
                                             cat_idx_start=self.cat_idx_start,
                                             cat_idx_end=self.cat_idx_end,
@@ -186,6 +191,12 @@ class XGBoostAgeClock:
                                             loader_method=self.loader_method,
                                             dataset_folder_dict=self.dataset_folder_dict
                                             )
+
+        ## loading all training data to the memory
+        if self.train_dataset_fully_loaded:
+            print("Using All .h5ad files that are loaded into memory!")
+            train_h5ad_dir = os.path.join(anndata_dir_root, self.dataset_folder_dict["training"])
+            self.train_all_data = fully_loaded(train_h5ad_dir)
 
         ## create XGBoostRegressor model
         # eval_metric will be chosen based on objective parameter setting
@@ -210,43 +221,61 @@ class XGBoostAgeClock:
 
     def train(self,):
         start_time = time.time()  # Start timing
-        #init_model = None
         eval_metrics_list = []
-        print("Start training")
-        logging.info("Start training")
-        for i, (features, labels_soma) in enumerate(self.dataloader.dataloader_train, start=1):
-            labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1) ## TODO: double check
-            X_train, y_train = self.dataloader.get_inputs(X_tensor=features,
-                                                          y_tensor=labels)
+        if not self.train_dataset_fully_loaded:
+            print("Start training")
+            logging.info("Start training")
+            for i, (features, labels_soma) in enumerate(self.dataloader.dataloader_train, start=1):
+                labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1) ## TODO: double check
+                X_train, y_train = self.dataloader.get_inputs(X=features,
+                                                              y=labels)
 
-            # Train the model on the current batch
-            if i == 1:
-                if self.validation_during_training:
-                    self.model.fit(X_train, y_train, eval_set=[(X_train, y_train), (self.X_val, self.y_val)])
+                # Train the model on the current batch
+                if i == 1:
+                    if self.validation_during_training:
+                        self.model.fit(X_train, y_train, eval_set=[(X_train, y_train), (self.X_val, self.y_val)])
+                    else:
+                        self.model.fit(X_train, y_train)
                 else:
-                    self.model.fit(X_train, y_train)
-            else:
-                if self.validation_during_training:
-                    self.model.fit(X_train, y_train,
-                                   eval_set=[(X_train, y_train), (self.X_val, self.y_val)],
-                                   xgb_model=self.model.get_booster())
-                else:
-                    self.model.fit(X_train, y_train,
-                                   xgb_model=self.model.get_booster())
+                    if self.validation_during_training:
+                        self.model.fit(X_train, y_train,
+                                       eval_set=[(X_train, y_train), (self.X_val, self.y_val)],
+                                       xgb_model=self.model.get_booster())
+                    else:
+                        self.model.fit(X_train, y_train,
+                                       xgb_model=self.model.get_booster())
 
+                if self.validation_during_training:
+                    eval_metrics_list.append(self.model.evals_result_)  ## keep evals_result_ from each model
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                print(f"Accumulated time cost for {i}: {elapsed_time:.6f} seconds")  # print time relapse
+                logging.info(f"Accumulated time cost for iteration {i}: {elapsed_time:.6f} seconds")
+
+                if i >= self.train_batch_iter_max:
+                    print(f"Reaching maximal iter number: {self.train_batch_iter_max}")
+                    logging.info(f"Reaching maximal iter number: {self.train_batch_iter_max}")
+                    break
             if self.validation_during_training:
-                eval_metrics_list.append(self.model.evals_result_)  ## keep evals_result_ from each model
+                self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
+        else:
+            print("Start training in normal mode")
+            logging.info("Start training in normal mode")
+            features = self.train_all_data[0]
+            labels = self.train_all_data[1][:,0]
+            X_train, y_train = self.dataloader.get_inputs(X=features,
+                                                          y=labels)
+            if self.validation_during_training:
+                self.model.fit(X_train, y_train, eval_set=[(X_train, y_train), (self.X_val, self.y_val)])
+                self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
+            else:
+                print("warning: no validation data")
+                self.model.fit(X_train, y_train)
+
             end_time = time.time()
             elapsed_time = end_time - start_time
-            print(f"Accumulated time cost for {i}: {elapsed_time:.6f} seconds")  # print time relapse
-            logging.info(f"Accumulated time cost for iteration {i}: {elapsed_time:.6f} seconds")
-
-            if i >= self.train_batch_iter_max:
-                print(f"Reaching maximal iter number: {self.train_batch_iter_max}")
-                logging.info(f"Reaching maximal iter number: {self.train_batch_iter_max}")
-                break
-        if self.validation_during_training:
-            self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
+            print(f"Time cost for the training: {elapsed_time:.6f} seconds")  # print time relapse
+            logging.info(f"Time cost for the training: {elapsed_time:.6f} seconds")
         end_time = time.time()  # End timing
         elapsed_time = end_time - start_time
         print(f"Total time costs: {elapsed_time:.6f} seconds")  # print time relapse
@@ -265,43 +294,52 @@ class XGBoostAgeClock:
         return predictions, targets_all, soma_ids_all
 
     def _predict_basic(self, ):
-        if self.predict_dataset == "testing":
-            if "testing" not in self.dataset_folder_dict:
-                raise ValueError("testing datasets is not provided!")
+        if not self.predict_dataset_fully_loaded:
+            if self.predict_dataset == "testing":
+                if "testing" not in self.dataset_folder_dict:
+                    raise ValueError("testing datasets is not provided!")
+                else:
+                    predict_dataloader = self.dataloader.dataloader_test
+            elif self.predict_dataset == "validation":
+                if "validation" not in self.dataset_folder_dict:
+                    raise ValueError("validation datasets is not provided!")
+                else:
+                    predict_dataloader = self.dataloader.dataloader_val
+            elif self.predict_dataset == "training":
+                if "training" not in self.dataset_folder_dict:
+                    raise ValueError("training datasets is not provided!")
+                else:
+                    predict_dataloader = self.dataloader.dataloader_train
             else:
-                predict_dataloader = self.dataloader.dataloader_test
-        elif self.predict_dataset == "validation":
-            if "validation" not in self.dataset_folder_dict:
-                raise ValueError("validation datasets is not provided!")
-            else:
-                predict_dataloader = self.dataloader.dataloader_val
-        elif self.predict_dataset == "training":
-            if "training" not in self.dataset_folder_dict:
-                raise ValueError("training datasets is not provided!")
-            else:
-                predict_dataloader = self.dataloader.dataloader_train
+                raise ValueError("supported datasets for prediction: training, testing, and validation")
+            predictions = []
+            targets_all = []
+            soma_ids_all = []
+            iter_num = 0
+            test_samples_num = 0
+            for i, (features, labels_soma) in enumerate(predict_dataloader, start=1):
+                labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
+                X_test, y_test = self.dataloader.get_inputs(X=features,
+                                                            y=labels)
+                outputs = self.model.predict(X_test)
+                outputs = outputs.squeeze()
+                labels = labels.squeeze()
+                labels = labels.to(torch.float32)
+                predictions.extend(outputs)
+                targets_all.extend(labels.numpy())
+                soma_ids_all.extend(soma_ids.numpy())
+                test_samples_num += features.size(0)
+                iter_num += 1
+                if iter_num >= self.predict_batch_iter_max:
+                    break
         else:
-            raise ValueError("supported datasets for prediction: training, testing, and validation")
-        predictions = []
-        targets_all = []
-        soma_ids_all = []
-        iter_num = 0
-        test_samples_num = 0
-        for i, (features, labels_soma) in enumerate(predict_dataloader, start=1):
-            labels, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
-            X_test, y_test = self.dataloader.get_inputs(X_tensor=features,
-                                                          y_tensor=labels)
-            outputs = self.model.predict(X_test)
-            outputs = outputs.squeeze()
-            labels = labels.squeeze()
-            labels = labels.to(torch.float32)
-            predictions.extend(outputs)
-            targets_all.extend(labels.numpy())
-            soma_ids_all.extend(soma_ids.numpy())
-            test_samples_num += features.size(0)
-            iter_num += 1
-            if iter_num >= self.predict_batch_iter_max:
-                break
+            X, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict[self.predict_dataset]))
+            targets_all = y_and_soma[:,0]
+            soma_ids_all = y_and_soma[:,1]
+            X_test, y_test = self.dataloader.get_inputs(X=X,
+                                                       y=targets_all)
+            predictions = self.model.predict(X_test)
+            predictions = predictions.squeeze()
 
         return predictions, targets_all, np.array(soma_ids_all).flatten()
 
@@ -325,39 +363,56 @@ class XGBoostAgeClock:
 
 
     def _get_val_data(self):
-        data_iter_val = iter(self.dataloader.dataloader_val)
-        X_val, y_and_soma = next(data_iter_val)
-        y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
-        X_val, y_val = self.dataloader.get_inputs(X_tensor=X_val,
-                                                  y_tensor=y_val)
+        if not self.validation_dataset_fully_loaded:
+            data_iter_val = iter(self.dataloader.dataloader_val)
+            X_val, y_and_soma = next(data_iter_val)
+            y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
+            X_val, y_val = self.dataloader.get_inputs(X=X_val,
+                                                      y=y_val)
+        else:
+            print("All validation data is used")
+            X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict["validation"]))
+            y_val = y_and_soma[:,0]
+            soma_ids = y_and_soma[:,1]
+            X_val, y_val = self.dataloader.get_inputs(X=X_val,
+                                                  y=y_val)
         return X_val, y_val, soma_ids
 
-    ## use the first batch of the validation data loader as the validation pool for the training process evaluation
-    ## TODO: improve the val_pool usage
-    def _get_val_pool(self):
-        data_iter_val = iter(self.dataloader.dataloader_val)
-        X_val, y_and_soma = next(data_iter_val)
-        y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
-        val_pool = self.dataloader.get_DMatrix(X_tensor=X_val,
-                                               y_tensor=y_val)
-        return val_pool, soma_ids
+    # ## use the first batch of the validation data loader as the validation pool for the training process evaluation
+    # ## TODO: improve the val_pool usage
+    # def _get_val_pool(self):
+    #     if not self.validation_dataset_fully_loaded:
+    #         data_iter_val = iter(self.dataloader.dataloader_val)
+    #         X_val, y_and_soma = next(data_iter_val)
+    #         y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
+    #         val_pool = self.dataloader.get_DMatrix(X=X_val,
+    #                                                y=y_val)
+    #         return val_pool, soma_ids
+    #     else:
+    #         print("All validation data is used")
+    #         X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict["validation"]))
+    #         y_val = y_and_soma[:,0]
+    #         soma_ids = y_and_soma[:,1]
+    #         val_pool = self.dataloader.get_DMatrix(X_tensor=X_val,
+    #                                                y_tensor=y_val)
 
-    ## TODO: improve the test_pool
-    def _get_test_pool(self):
-        data_iter_test = iter(self.dataloader.dataloader_test)
-        X_test, y_and_soma = next(data_iter_test)
-        y_test, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
-        test_pool = self.dataloader.get_DMatrix(X_tensor=X_test,
-                                                y_tensor=y_test)
-        return test_pool, X_test, y_test, soma_ids
 
-    def _get_test_data(self):
-        data_iter_test = iter(self.dataloader.dataloader_test)
-        X_test, y_and_soma = next(data_iter_test)
-        y_test, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
-        X_test, y_test = self.dataloader.get_inputs(X_tensor=X_test,
-                                                    y_tensor=y_test)
-        return X_test, y_test, soma_ids
+    # ## TODO: improve the test_pool
+    # def _get_test_pool(self):
+    #     data_iter_test = iter(self.dataloader.dataloader_test)
+    #     X_test, y_and_soma = next(data_iter_test)
+    #     y_test, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
+    #     test_pool = self.dataloader.get_DMatrix(X_tensor=X_test,
+    #                                             y_tensor=y_test)
+    #     return test_pool, X_test, y_test, soma_ids
+    #
+    # def _get_test_data(self):
+    #     data_iter_test = iter(self.dataloader.dataloader_test)
+    #     X_test, y_and_soma = next(data_iter_test)
+    #     y_test, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
+    #     X_test, y_test = self.dataloader.get_inputs(X=X_test,
+    #                                                 y=y_test)
+    #     return X_test, y_test, soma_ids
 
     ## process the CatBoost evals_result_ from multiple batch training
     def _reformat_eval_metrics(self,
