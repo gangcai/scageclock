@@ -62,7 +62,7 @@ class GatedMultiheadAttentionAgeClock:
         :param num_workers: number of parallel jobs for Data Loading
         :param age_column: age column name in the adata.obs
         :param cell_id:cell id column name in the adata.obs # default using CELLxGENE soma_joinid
-        :param loader_method: loader method used: "torch" or "scageclock"
+        :param loader_method: loader method used: "scageclock" or "scageclock_balanced"
         :param l1_lambda: L1 regularization parameter
         :param l2_lambda: L2 regularization parameter
         :param dropout_prob: dropout probability
