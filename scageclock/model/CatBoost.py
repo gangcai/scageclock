@@ -161,7 +161,7 @@ class CatBoostAgeClock:
 
         ## loading all training data to the memory
         if self.train_dataset_fully_loaded:
-            print("Using All .h5ad files that are loaded into memory!")
+            print("All training .h5ad files are loaded into memory!")
             train_h5ad_dir = os.path.join(anndata_dir_root, self.dataset_folder_dict["training"])
             self.train_all_data = fully_loaded(train_h5ad_dir)
 
@@ -228,7 +228,7 @@ class CatBoostAgeClock:
                 print("warning: no validation data")
                 self.model.fit(train_pool, verbose=10)
             if self.validation_during_training:
-                self.eval_metrics = self._reformat_eval_metrics(self.model.evals_result_)
+                self.eval_metrics = self._reformat_eval_metrics([self.model.evals_result_])
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Time cost for the training: {elapsed_time:.6f} seconds")  # print time relapse
@@ -265,7 +265,7 @@ class CatBoostAgeClock:
             val_pool = self.dataloader.get_pool_data(X=X_val,
                                                      y=y_val)
         else:
-            print("All validation data is used")
+            print("All validation data is used and loaded into memory")
             X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict["validation"]))
             y_val = y_and_soma[:,0]
             soma_ids = y_and_soma[:,1]
@@ -275,6 +275,7 @@ class CatBoostAgeClock:
 
     def _predict_basic(self, ):
         if not self.predict_dataset_fully_loaded:
+            print("prediction based on multiple batches")
             if self.predict_dataset == "testing":
                 if "testing" not in self.dataset_folder_dict:
                     raise ValueError("testing datasets is not provided!")
@@ -313,6 +314,7 @@ class CatBoostAgeClock:
                 if iter_num >= self.predict_batch_iter_max:
                     break
         else:
+            print("prediction based on all prediction datasets, all of which is loaded into memory")
             X, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict[self.predict_dataset]))
             targets_all = y_and_soma[:,0]
             soma_ids_all = y_and_soma[:,1]
@@ -326,25 +328,43 @@ class CatBoostAgeClock:
     ## process the CatBoost evals_result_ from multiple batch training
     def _reformat_eval_metrics(self,
                               eval_metrics_list):
-        all_batch_id = []
-        all_train_rmse = []
-        all_val_rmse = []
-        all_steps = []
-        i = 0
-        for metric in eval_metrics_list:
-            train_metric = list(metric["learn"]["RMSE"])
-            val_metric = list(metric["validation"]["RMSE"])
-            all_train_rmse = all_train_rmse + train_metric
-            all_val_rmse = all_val_rmse + val_metric
-            all_batch_id = all_batch_id + list([i] * len(train_metric))
-            for val in val_metric:
-                i += 1
-                all_steps.append(i)
+        if self.validation_during_training:
+            all_batch_id = []
+            all_train_rmse = []
+            all_val_rmse = []
+            all_steps = []
+            i = 0
+            for metric in eval_metrics_list:
+                train_metric = list(metric["learn"]["RMSE"])
+                val_metric = list(metric["validation"]["RMSE"])
+                all_train_rmse = all_train_rmse + train_metric
+                all_val_rmse = all_val_rmse + val_metric
+                all_batch_id = all_batch_id + list([i] * len(train_metric))
+                for val in val_metric:
+                    i += 1
+                    all_steps.append(i)
 
-        train_metrics_df = pd.DataFrame({"batch_id": all_batch_id * 2,
-                                         "step": all_steps * 2,
-                                         "RMSE": all_train_rmse + all_val_rmse,
-                                         "label": ["train"] * len(all_train_rmse) + ["validation"] * len(all_val_rmse)})
+            train_metrics_df = pd.DataFrame({"batch_id": all_batch_id * 2,
+                                             "step": all_steps * 2,
+                                             "RMSE": all_train_rmse + all_val_rmse,
+                                             "label": ["train"] * len(all_train_rmse) + ["validation"] * len(all_val_rmse)})
+        else:
+            all_batch_id = []
+            all_train_rmse = []
+            all_steps = []
+            i = 0
+            for metric in eval_metrics_list:
+                train_metric = list(metric["learn"]["RMSE"])
+                all_train_rmse = all_train_rmse + train_metric
+                all_batch_id = all_batch_id + list([i] * len(train_metric))
+                for val in train_metric:
+                    i += 1
+                    all_steps.append(i)
+
+            train_metrics_df = pd.DataFrame({"batch_id": all_batch_id,
+                                             "step": all_steps,
+                                             "RMSE": all_train_rmse,
+                                             "label": ["train"] * len(all_train_rmse)})
         return train_metrics_df
 
 
