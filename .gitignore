@@ -1,4 +1,7 @@
 scageclock/__pycache__
+__pycache__/
+tests/__pycache__/
+scageclock/model/__pycache__/
 .idea
 .idea/misc.xml
 .idea/scageclock.iml
