@@ -71,6 +71,10 @@ def get_validation_metrics(y_true,
     r2_rev = r2_score(y_pred,y_true)
     correlation, p_value = scipy.stats.pearsonr(y_pred, y_true)
 
+    rmse = float(rmse)
+    correlation = float(correlation)
+    p_value = float(p_value)
+
     if print_metrics:
         print(f"Mean Squared Error (MSE): {mse}")
         print(f"Root Mean Squared Error (RMSE): {rmse}")
