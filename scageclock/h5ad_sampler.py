@@ -15,11 +15,14 @@ class H5ADSampler:
                  meta_cell_id_colname: str = "soma_joinid",
                  anndata_cell_id_colname: str = "soma_joinid", # in anndata.obs
                  backed: Literal["r", "r+"] | bool | None = 'r',
-                 meta_category_colname: str = "cell_type", # or tissue_general
+                 meta_category_colname: str = "tissue_general", # or cell_type
                  category_list: list | None = None,
                  category_balanced: bool = True,
                  sample_num: int | None = 10000,
                  sample_replace: bool = False,
+                 concat_anndata: bool = True, # set to be False if too many is sampled
+                 prefix: str = "scAgeClock_Sampled",
+                 outdir: str = "./"
                  ):
 
         if meta_file_format == "parquet":
@@ -52,6 +55,9 @@ class H5ADSampler:
         self.category_balanced = category_balanced
         self.sample_num = sample_num
         self.sample_replace = sample_replace
+        self.concat_anndata = concat_anndata
+        self.prefix = prefix
+        self.outdir = outdir
 
         self.total_cell_num = self.meta_df.shape[0]
 
@@ -69,14 +75,22 @@ class H5ADSampler:
         return ad_join
 
     def sample_by_category(self):
-        meta_df_s = self.meta_df[self.meta_df[self.meta_category_colname].isin(self.category_list)]
+        if self.category_list is None:
+            print("No category selection")
+            meta_df_s = self.meta_df
+        else:
+            print("Start category selection")
+            meta_df_s = self.meta_df[self.meta_df[self.meta_category_colname].isin(self.category_list)]
         if meta_df_s.empty:
             raise ValueError(f"Empty meta dataframe found for {self.category_list} in {self.meta_category_colname} column")
 
         if not self.sample_num is None:
             if self.category_balanced:
                 ## category level balanced sampling of the cells
-                sample_size_per_cat = meta_df_s.shape[0] // self.sample_num
+                cat_num = len(self.meta_df[self.meta_category_colname].unique())
+                print(f"Total Number of unique category: {cat_num}")
+                sample_size_per_cat = self.sample_num // cat_num
+                print(f"Average For each category: {sample_size_per_cat}")
                 meta_df_sampled_1 = meta_df_s.groupby(self.meta_category_colname, group_keys=False).apply(
                     lambda x: x.sample(n=min(sample_size_per_cat, len(x)), replace=self.sample_replace)
                 )
@@ -97,17 +111,29 @@ class H5ADSampler:
         ad_join = self._extract_by_metadata(meta_df_s2)
         return ad_join
 
+    # TODO: handle with large sampling
     def _extract_by_metadata(self, meta_df_s):
         cell_ids = list(meta_df_s[self.meta_cell_id_colname])
-        ad_list = []
-        for ad_file in self.ad_files:
-            adata = sc.read_h5ad(ad_file, backed=self.backed)
-            adata_s = adata[adata.obs[self.anndata_cell_id_colname].isin(cell_ids)]
-            if adata_s.shape[0] > 0:
-                ad_list.append(adata_s)
-        ad_join = anndata.concat(ad_list)
-        ad_join.var_names_make_unique()
-        return ad_join
+        if self.concat_anndata:
+            ad_list = []
+            for ad_file in self.ad_files:
+                adata = sc.read_h5ad(ad_file, backed=self.backed)
+                adata_s = adata[adata.obs[self.anndata_cell_id_colname].isin(cell_ids)]
+                if adata_s.shape[0] > 0:
+                    ad_list.append(adata_s)
+            ad_join = anndata.concat(ad_list)
+            ad_join.var_names_make_unique()
+            return ad_join
+        else:
+            chunk_id = 0
+            for ad_file in self.ad_files:
+                adata = sc.read_h5ad(ad_file, backed=self.backed)
+                adata_s = adata[adata.obs[self.anndata_cell_id_colname].isin(cell_ids)]
+                if adata_s.shape[0] > 0:
+                    chunk_id += 1
+                    adata_s.write_h5ad(os.path.join(self.outdir, f"{self.prefix}_chunk{chunk_id}.h5ad"))
+            return None
+
 
 
 
