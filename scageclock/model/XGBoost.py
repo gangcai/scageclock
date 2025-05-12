@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 from xgboost import XGBRegressor
-import xgboost as xgb
 import time
 from ..utility import get_validation_metrics
 import torch
@@ -48,24 +47,6 @@ class XGBoostDataLoader(BasicDataLoader):
         self.cat_idx_start = cat_idx_start
         self.cat_idx_end = cat_idx_end
         self.use_cat = use_cat
-
-    # ## get XGBoost DMatrix data
-    # def get_DMatrix(self,
-    #                   X_tensor,
-    #                   y_tensor):
-    #     X_df = pd.DataFrame(X_tensor, columns=list(self.var_df[self.var_colname]))
-    #     y = np.array(y_tensor)
-    #
-    #     if self.use_cat:
-    #         columns = X_df.columns
-    #         categorical_cols = list(columns[self.cat_idx_start:self.cat_idx_end])
-    #         # convert categorical value to category type
-    #         X_df[categorical_cols] = X_df[categorical_cols].astype("category")
-    #         d_matrix = xgb.DMatrix(X_df, label=y, feature_names=list(self.var_df[self.var_colname]), enable_categorical=True)
-    #         return d_matrix
-    #     else:
-    #         d_matrix = xgb.DMatrix(X_df, label=y, feature_names=list(self.var_df[self.var_colname]), enable_categorical=False)
-    #         return d_matrix
 
     def get_inputs(self,
                    X,
@@ -194,7 +175,7 @@ class XGBoostAgeClock:
 
         ## loading all training data to the memory
         if self.train_dataset_fully_loaded:
-            print("Using All .h5ad files that are loaded into memory!")
+            print("All training .h5ad files are loaded into memory!")
             train_h5ad_dir = os.path.join(anndata_dir_root, self.dataset_folder_dict["training"])
             self.train_all_data = fully_loaded(train_h5ad_dir)
 
@@ -221,8 +202,8 @@ class XGBoostAgeClock:
 
     def train(self,):
         start_time = time.time()  # Start timing
-        eval_metrics_list = []
         if not self.train_dataset_fully_loaded:
+            eval_metrics_list = []
             print("Start training")
             logging.info("Start training")
             for i, (features, labels_soma) in enumerate(self.dataloader.dataloader_train, start=1):
@@ -267,10 +248,10 @@ class XGBoostAgeClock:
                                                           y=labels)
             if self.validation_during_training:
                 self.model.fit(X_train, y_train, eval_set=[(X_train, y_train), (self.X_val, self.y_val)])
-                self.eval_metrics = self._reformat_eval_metrics(eval_metrics_list)
+                self.eval_metrics = self._reformat_eval_metrics([self.model.evals_result_])
             else:
                 print("warning: no validation data")
-                self.model.fit(X_train, y_train)
+                self.model.fit(X_train, y_train, eval_set = [(X_train, y_train)])
 
             end_time = time.time()
             elapsed_time = end_time - start_time
@@ -295,6 +276,7 @@ class XGBoostAgeClock:
 
     def _predict_basic(self, ):
         if not self.predict_dataset_fully_loaded:
+            print("prediction based on multiple batches")
             if self.predict_dataset == "testing":
                 if "testing" not in self.dataset_folder_dict:
                     raise ValueError("testing datasets is not provided!")
@@ -323,16 +305,18 @@ class XGBoostAgeClock:
                                                             y=labels)
                 outputs = self.model.predict(X_test)
                 outputs = outputs.squeeze()
-                labels = labels.squeeze()
-                labels = labels.to(torch.float32)
+                outputs = [float(x) for x in outputs]
+                y_test = y_test.squeeze()
+                y_test = [float(x) for x in y_test]
                 predictions.extend(outputs)
-                targets_all.extend(labels.numpy())
+                targets_all.extend(y_test)
                 soma_ids_all.extend(soma_ids.numpy())
                 test_samples_num += features.size(0)
                 iter_num += 1
                 if iter_num >= self.predict_batch_iter_max:
                     break
         else:
+            print("prediction based on all prediction datasets, all of which is loaded into memory")
             X, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict[self.predict_dataset]))
             targets_all = y_and_soma[:,0]
             soma_ids_all = y_and_soma[:,1]
@@ -364,13 +348,14 @@ class XGBoostAgeClock:
 
     def _get_val_data(self):
         if not self.validation_dataset_fully_loaded:
+            print("One batch of validation dataset is used")
             data_iter_val = iter(self.dataloader.dataloader_val)
             X_val, y_and_soma = next(data_iter_val)
             y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
             X_val, y_val = self.dataloader.get_inputs(X=X_val,
                                                       y=y_val)
         else:
-            print("All validation data is used")
+            print("All validation data is used and loaded into memory")
             X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict["validation"]))
             y_val = y_and_soma[:,0]
             soma_ids = y_and_soma[:,1]
@@ -378,64 +363,46 @@ class XGBoostAgeClock:
                                                   y=y_val)
         return X_val, y_val, soma_ids
 
-    # ## use the first batch of the validation data loader as the validation pool for the training process evaluation
-    # ## TODO: improve the val_pool usage
-    # def _get_val_pool(self):
-    #     if not self.validation_dataset_fully_loaded:
-    #         data_iter_val = iter(self.dataloader.dataloader_val)
-    #         X_val, y_and_soma = next(data_iter_val)
-    #         y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
-    #         val_pool = self.dataloader.get_DMatrix(X=X_val,
-    #                                                y=y_val)
-    #         return val_pool, soma_ids
-    #     else:
-    #         print("All validation data is used")
-    #         X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict["validation"]))
-    #         y_val = y_and_soma[:,0]
-    #         soma_ids = y_and_soma[:,1]
-    #         val_pool = self.dataloader.get_DMatrix(X_tensor=X_val,
-    #                                                y_tensor=y_val)
-
-
-    # ## TODO: improve the test_pool
-    # def _get_test_pool(self):
-    #     data_iter_test = iter(self.dataloader.dataloader_test)
-    #     X_test, y_and_soma = next(data_iter_test)
-    #     y_test, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
-    #     test_pool = self.dataloader.get_DMatrix(X_tensor=X_test,
-    #                                             y_tensor=y_test)
-    #     return test_pool, X_test, y_test, soma_ids
-    #
-    # def _get_test_data(self):
-    #     data_iter_test = iter(self.dataloader.dataloader_test)
-    #     X_test, y_and_soma = next(data_iter_test)
-    #     y_test, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
-    #     X_test, y_test = self.dataloader.get_inputs(X=X_test,
-    #                                                 y=y_test)
-    #     return X_test, y_test, soma_ids
-
     ## process the CatBoost evals_result_ from multiple batch training
     def _reformat_eval_metrics(self,
                               eval_metrics_list):
-        all_batch_id = []
-        all_train_rmse = []
-        all_val_rmse = []
-        all_steps = []
-        i = 0
-        for metric in eval_metrics_list:
-            train_metric = list(metric["validation_0"]["rmse"]) # training datasets
-            val_metric = list(metric["validation_1"]["rmse"]) # validation datasets
-            all_train_rmse = all_train_rmse + train_metric
-            all_val_rmse = all_val_rmse + val_metric
-            all_batch_id = all_batch_id + list([i] * len(train_metric))
-            for val in val_metric:
-                i += 1
-                all_steps.append(i)
+        if self.validation_during_training:
+            all_batch_id = []
+            all_train_rmse = []
+            all_val_rmse = []
+            all_steps = []
+            i = 0
+            for metric in eval_metrics_list:
+                train_metric = list(metric["validation_0"]["rmse"]) # training datasets
+                val_metric = list(metric["validation_1"]["rmse"]) # validation datasets
+                all_train_rmse = all_train_rmse + train_metric
+                all_val_rmse = all_val_rmse + val_metric
+                all_batch_id = all_batch_id + list([i] * len(train_metric))
+                for val in val_metric:
+                    i += 1
+                    all_steps.append(i)
 
-        train_metrics_df = pd.DataFrame({"batch_id": all_batch_id * 2,
-                                         "step": all_steps * 2,
-                                         "RMSE": all_train_rmse + all_val_rmse,
-                                         "label": ["train"] * len(all_train_rmse) + ["validation"] * len(all_val_rmse)})
+            train_metrics_df = pd.DataFrame({"batch_id": all_batch_id * 2,
+                                             "step": all_steps * 2,
+                                             "RMSE": all_train_rmse + all_val_rmse,
+                                             "label": ["train"] * len(all_train_rmse) + ["validation"] * len(all_val_rmse)})
+        else:
+            all_batch_id = []
+            all_train_rmse = []
+            all_steps = []
+            i = 0
+            for metric in eval_metrics_list:
+                train_metric = list(metric["validation_0"]["rmse"])  # training datasets
+                all_train_rmse = all_train_rmse + train_metric
+                all_batch_id = all_batch_id + list([i] * len(train_metric))
+                for val in train_metric:
+                    i += 1
+                    all_steps.append(i)
+
+            train_metrics_df = pd.DataFrame({"batch_id": all_batch_id,
+                                             "step": all_steps,
+                                             "RMSE": all_train_rmse,
+                                             "label": ["train"] * len(all_train_rmse)})
         return train_metrics_df
 
 
