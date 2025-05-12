@@ -181,11 +181,19 @@ class H5ADDataLoader:
         return cumulative_sizes
 
     def _process_h5ad_file(self, file_path, index_selected):
-        ad = sc.read_h5ad(file_path, backed="r")
-        ad_select = ad[index_selected]
-        sample_X = ad_select.X.toarray()
-        age_soma = ad_select.obs[[self.age_column, self.cell_id]].values
-        age_soma = np.array(age_soma, dtype=np.int32)
+        try:
+            ad = sc.read_h5ad(file_path, backed="r")
+            ad_select = ad[index_selected]
+            sample_X = ad_select.X.toarray()
+            age_soma = ad_select.obs[[self.age_column, self.cell_id]].values
+            age_soma = np.array(age_soma, dtype=np.int32)
+        except Exception as e:
+            print(f"Warning: backed mode failed with error. Try normal mode h5ad loading without backed-end")
+            ad = sc.read_h5ad(file_path)
+            ad_select = ad[index_selected]
+            sample_X = ad_select.X.toarray()
+            age_soma = ad_select.obs[[self.age_column, self.cell_id]].values
+            age_soma = np.array(age_soma, dtype=np.int32)
         return sample_X, age_soma
 
     def __len__(self):
