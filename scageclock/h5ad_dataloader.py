@@ -210,7 +210,9 @@ class BalancedH5ADDataLoader:
                  balanced_feature_col: int = 3,## the first four columns: assay, cell_type, tissue_general, sex. Here default for tissue level balanced sampling
                  balanced_feature_col_max: int = 4,
                  batch_size: int = 1000,
-                 batch_iter_max: int = 10000):
+                 batch_iter_max: int = 10000,
+                 feature_idx_df: str | None = None,
+                 ):
         """
         Create a DataLoader based on a list of .h5ad files, and balanced sampling of the cells
 
@@ -221,6 +223,7 @@ class BalancedH5ADDataLoader:
         :param balanced_feature_col_max: maximal number of categorical data that can be used for balancing
         :param batch_size: batch size of the DataLoader
         :param batch_iter_max: maximal iteration allowed
+        :param feature_idx_df: provided file_paths matched feature_idx_df (save time for creating of this dataframe), if None, create it.
         """
         self.file_paths = file_paths
         self.age_column = age_column
@@ -238,9 +241,14 @@ class BalancedH5ADDataLoader:
         # Optionally, store the cumulative sizes of each file to efficiently index
         self.cumulative_sizes = self._compute_cumulative_sizes()
         self.batch_iter_start = 0
-        print("creating global index and category dataframe")
-        self.feature_idx_df, self.cats = self.get_feature_idx_df()
-        print("global index and category dataframe is created")
+        if feature_idx_df is None:
+            print("creating global index and category dataframe")
+            self.feature_idx_df, self.cats = self.get_feature_idx_df()
+            print("global index and category dataframe is created")
+        else:
+            self.feature_idx_df = feature_idx_df
+            self.cats = list(feature_idx_df["category"].unique())
+
         self.cats_num = len(self.cats)
         self.mini_batch_size = self.batch_size // self.cats_num  ## batch size for each selected feature category
 
@@ -279,59 +287,6 @@ class BalancedH5ADDataLoader:
 
 
     def get_feature_idx_df(self):
-        """
-        Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns 'index' and 'category' and unique list of category
-        """
-        start_time = time.time()
-
-        all_indices = []
-        all_categories = []
-        cumulative_index = 0
-
-        total_files_num = len(self.file_paths)
-        print(f"[INFO] Total number of files: {total_files_num}")
-
-        for counter, h5ad_file in enumerate(self.file_paths, 1):
-            try:
-                ad = sc.read_h5ad(h5ad_file, backed='r')
-
-                col_idx = self.balanced_feature_col - 1
-                if col_idx >= ad.n_vars:
-                    raise ValueError(f"Feature column {self.balanced_feature_col} out of range in {h5ad_file}")
-
-                col_data = ad[:, col_idx].X
-                features = np.array(col_data.toarray()).flatten()
-
-                all_indices.extend(range(cumulative_index, cumulative_index + len(features)))
-                all_categories.extend(features)
-
-                cumulative_index += len(features)
-                del ad
-
-                if counter % 30 == 0:
-                    elapsed_time = time.time() - start_time
-                    print(f"[INFO] Processed {counter}/{total_files_num} files. Time elapsed: {elapsed_time:.2f}s")
-
-            except Exception as e:
-                print(f"[ERROR] Failed processing {h5ad_file}: {str(e)}")
-                continue
-
-        # Single DataFrame creation (faster)
-        feature_idx_df = pd.DataFrame({
-            "index": all_indices,
-            "category": all_categories
-        })
-
-        cats = list(pd.unique(feature_idx_df["category"]))
-
-        elapsed_time = time.time() - start_time
-        print(f"[INFO] get_feature_idx_df completed in {elapsed_time:.2f} seconds.")
-        return feature_idx_df, cats
-
-    def get_feature_idx_df_old3(self):
         """
         Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
 
@@ -389,60 +344,6 @@ class BalancedH5ADDataLoader:
         end_time = time.time()
         elapsed_time = end_time - start_time
         print(f"[INFO] get_feature_idx_df executed in {elapsed_time:.2f} seconds.")
-        return feature_idx_df, cats
-
-    # TODO: slow and need to improve the speed
-    def get_feature_idx_df_old2(self):
-        """
-        Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns 'index' and 'category' and its statistic pd.DataFrame
-        """
-        # Initialize lists to store all data
-        all_indices = []
-        all_features = []
-
-        # Track cumulative index
-        cumulative_index = 0
-
-        for h5ad_file in self.file_paths:
-            try:
-                ad = sc.read_h5ad(h5ad_file, backed='r')
-
-                # Validate feature column exists
-                if self.balanced_feature_col - 1 >= ad.n_vars:
-                    raise ValueError(f"Feature column {self.balanced_feature_col} out of range")
-
-                # Get features as a flattened array
-                features = ad[:, self.balanced_feature_col - 1].X.toarray().flatten()
-
-                # Get the indices for this file's features
-                file_indices = np.arange(cumulative_index, cumulative_index + len(features))
-
-                # Append to our lists
-                all_indices.extend(file_indices)
-                all_features.extend(features)
-
-                # Update cumulative index for next file
-                cumulative_index += len(features)
-
-                # Explicitly close the AnnData object to free resources
-                del ad
-
-            except Exception as e:
-                print(f"Error processing {h5ad_file}: {str(e)}")
-                continue
-
-        # Create DataFrame
-        feature_idx_df = pd.DataFrame({
-            "index": all_indices,
-            "category": all_features
-        })
-
-        cat_stats = self.feature_idx_df["category"].value_counts().reset_index()
-        cats = list(cat_stats["category"])
-
         return feature_idx_df, cats
 
     def get_feature_idx_df_old(self):
