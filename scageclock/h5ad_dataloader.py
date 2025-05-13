@@ -200,6 +200,7 @@ class H5ADDataLoader:
         return self.total_samples
 
 
+# TODO: make batch_size workable
 class BalancedH5ADDataLoader:
 
     def __init__(self,
@@ -361,16 +362,20 @@ class BalancedH5ADDataLoader:
 def fully_loaded(h5ad_file_path: str,
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",  ## for tracing the data
+                 return_anndata: bool = False,
                  ):
     ad_files = glob.glob(os.path.join(h5ad_file_path, "*.h5ad"))
     ad_list = [sc.read_h5ad(f) for f in ad_files]
 
     ad_concat = anndata.concat(ad_list, label="chunk", keys=[os.path.basename(f) for f in ad_files])
 
-    X = ad_concat.X.toarray()
-    age_soma = ad_concat.obs[[age_column, cell_id]].values
-    age_soma = np.array(age_soma, dtype=np.int32)
-    return X, age_soma
+    if return_anndata:
+        return ad_concat
+    else:
+        X = ad_concat.X.toarray()
+        age_soma = ad_concat.obs[[age_column, cell_id]].values
+        age_soma = np.array(age_soma, dtype=np.int32)
+        return X, age_soma
 
 
 
