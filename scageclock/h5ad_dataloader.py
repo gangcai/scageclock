@@ -10,6 +10,9 @@ import pandas as pd
 import glob
 import os
 
+from asttokens.util import replace
+
+
 class H5ADDataLoader:
 
     def __init__(self,
@@ -200,7 +203,6 @@ class H5ADDataLoader:
         return self.total_samples
 
 
-# TODO: make batch_size workable
 class BalancedH5ADDataLoader:
 
     def __init__(self,
@@ -238,6 +240,11 @@ class BalancedH5ADDataLoader:
         # Optionally, store the cumulative sizes of each file to efficiently index
         self.cumulative_sizes = self._compute_cumulative_sizes()
         self.batch_iter_start = 0
+        print("creating global index and category dataframe")
+        self.feature_idx_df, self.cats = self.get_feature_idx_df()
+        print("global index and category dataframe is created")
+        self.cats_num = len(self.cats)
+        self.mini_batch_size = self.batch_size // self.cats_num  ## batch size for each selected feature category
 
     def __iter__(self):
         self.batch_iter_start = 0
@@ -272,7 +279,61 @@ class BalancedH5ADDataLoader:
 
         return exp_arr, age_soma_arr
 
-    def balanced_indices_sampling(self):
+    # TODO: slow and need to improve the speed
+    def get_feature_idx_df(self):
+        """
+        Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns 'index' and 'category' and its statistic pd.DataFrame
+        """
+        # Initialize lists to store all data
+        all_indices = []
+        all_features = []
+
+        # Track cumulative index
+        cumulative_index = 0
+
+        for h5ad_file in self.file_paths:
+            try:
+                ad = sc.read_h5ad(h5ad_file, backed='r')
+
+                # Validate feature column exists
+                if self.balanced_feature_col - 1 >= ad.n_vars:
+                    raise ValueError(f"Feature column {self.balanced_feature_col} out of range")
+
+                # Get features as a flattened array
+                features = ad[:, self.balanced_feature_col - 1].X.toarray().flatten()
+
+                # Get the indices for this file's features
+                file_indices = np.arange(cumulative_index, cumulative_index + len(features))
+
+                # Append to our lists
+                all_indices.extend(file_indices)
+                all_features.extend(features)
+
+                # Update cumulative index for next file
+                cumulative_index += len(features)
+
+                # Explicitly close the AnnData object to free resources
+                del ad
+
+            except Exception as e:
+                print(f"Error processing {h5ad_file}: {str(e)}")
+                continue
+
+        # Create DataFrame
+        feature_idx_df = pd.DataFrame({
+            "index": all_indices,
+            "category": all_features
+        })
+
+        cat_stats = self.feature_idx_df["category"].value_counts().reset_index()
+        cats = list(cat_stats["category"])
+
+        return feature_idx_df, cats
+
+    def get_feature_idx_df_old(self):
         index_lst = []
         feature_lst = []
         indx = -1
@@ -287,12 +348,29 @@ class BalancedH5ADDataLoader:
         feature_idx_df = pd.DataFrame({"index": index_lst,
                                        "category": feature_lst})
 
-        cat_stats = feature_idx_df["category"].value_counts().reset_index()
+        cat_stats = self.feature_idx_df["category"].value_counts().reset_index()
         cats = list(cat_stats["category"])
-        cat_num = len(cats)
-        mini_batch_size = self.batch_size // cat_num  ## batch size for each selected feature category
-        sampled_idx = self._index_sampling(cats=cats, feature_idx_df=feature_idx_df, batch_size=mini_batch_size)
-        return sampled_idx
+
+
+        return feature_idx_df, cats
+
+
+    def balanced_indices_sampling(self):
+        sampled_idx = self._index_sampling(cats=self.cats, feature_idx_df=self.feature_idx_df, batch_size=self.mini_batch_size)
+
+        sampled_len = len(sampled_idx)
+
+        if sampled_len == self.batch_size:
+            return sampled_idx
+        elif sampled_len > self.batch_size:
+            raise ValueError(f"sampled length ({sampled_len}) is larger than the batch size ({self.batch_size})")
+        else:
+            remained_sample_size = self.batch_size - sampled_len
+            feature_idx_df_remained = self.feature_idx_df[~self.feature_idx_df["index"].isin(sampled_idx)]
+            remained_sampled = feature_idx_df_remained.sample(n=remained_sample_size,replace=False)
+            remained_idx = list(remained_sampled["index"])
+            sampled_idx = sampled_idx + remained_idx
+            return sampled_idx
 
     def _index_sampling(self, cats, feature_idx_df, batch_size):
         sampled_idx = []
