@@ -279,8 +279,58 @@ class BalancedH5ADDataLoader:
 
         return exp_arr, age_soma_arr
 
-    # TODO: slow and need to improve the speed
     def get_feature_idx_df(self):
+        """
+        Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns 'index' and 'category' and its statistics list.
+        """
+        from collections import Counter
+        from scipy.sparse import issparse
+
+        data = []
+        cumulative_index = 0
+        category_counter = Counter()
+
+        for h5ad_file in self.file_paths:
+            try:
+                ad = sc.read_h5ad(h5ad_file, backed='r')
+
+                col_idx = self.balanced_feature_col - 1
+                if col_idx >= ad.n_vars:
+                    raise ValueError(f"Feature column {self.balanced_feature_col} out of range in {h5ad_file}")
+
+                # Read the entire column (sparse or dense)
+                col_data = ad[:, col_idx].X
+                if issparse(col_data):
+                    features = np.array(col_data.toarray()).flatten()
+                else:
+                    features = np.array(col_data).flatten()
+
+                indices = np.arange(cumulative_index, cumulative_index + len(features))
+                data.append(pd.DataFrame({"index": indices, "category": features}))
+
+                # Update category stats on the fly
+                category_counter.update(features)
+                cumulative_index += len(features)
+
+                del ad
+
+            except Exception as e:
+                print(f"Error processing {h5ad_file}: {str(e)}")
+                continue
+
+        # Combine DataFrames only once
+        feature_idx_df = pd.concat(data, ignore_index=True)
+
+        # Compute category stats from counter
+        cats = [k for k, _ in category_counter.most_common()]
+
+        return feature_idx_df, cats
+
+    # TODO: slow and need to improve the speed
+    def get_feature_idx_df_old2(self):
         """
         Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
 
