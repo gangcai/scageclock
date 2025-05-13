@@ -452,7 +452,7 @@ class BalancedH5ADDataLoader:
 ## given a folder path with .h5ad files, load them all into memory
 def fully_loaded(h5ad_file_path: str,
                  age_column: str = "age",
-                 cell_id: str = "soma_joinid",  ## for tracing the data
+                 cell_id: str = "soma_joinid",
                  return_anndata: bool = False,
                  ):
     ad_files = glob.glob(os.path.join(h5ad_file_path, "*.h5ad"))
@@ -467,6 +467,22 @@ def fully_loaded(h5ad_file_path: str,
         age_soma = ad_concat.obs[[age_column, cell_id]].values
         age_soma = np.array(age_soma, dtype=np.int32)
         return X, age_soma
+
+
+def get_cell_ids(h5ad_file_path: str,
+                 age_column: str = "age",
+                 cell_id: str = "soma_joinid",
+                 ):
+    ad_files = glob.glob(os.path.join(h5ad_file_path, "*.h5ad"))
+
+    series_list = []
+    for ad_file in ad_files:
+        ad = sc.read_h5ad(ad_file, backed="r")
+        cell_ids = ad.obs[cell_id]
+        series_list.append(cell_ids)
+    result = pd.concat(series_list)
+    return list(result)
+
 
 
 
