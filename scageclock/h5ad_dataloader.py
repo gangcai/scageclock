@@ -11,9 +11,6 @@ import glob
 import os
 import time
 
-from asttokens.util import replace
-
-
 class H5ADDataLoader:
 
     def __init__(self,
@@ -280,7 +277,61 @@ class BalancedH5ADDataLoader:
 
         return exp_arr, age_soma_arr
 
+
     def get_feature_idx_df(self):
+        """
+        Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns 'index' and 'category' and unique list of category
+        """
+        start_time = time.time()
+
+        all_indices = []
+        all_categories = []
+        cumulative_index = 0
+
+        total_files_num = len(self.file_paths)
+        print(f"[INFO] Total number of files: {total_files_num}")
+
+        for counter, h5ad_file in enumerate(self.file_paths, 1):
+            try:
+                ad = sc.read_h5ad(h5ad_file, backed='r')
+
+                col_idx = self.balanced_feature_col - 1
+                if col_idx >= ad.n_vars:
+                    raise ValueError(f"Feature column {self.balanced_feature_col} out of range in {h5ad_file}")
+
+                col_data = ad[:, col_idx].X
+                features = np.array(col_data.toarray()).flatten()
+
+                all_indices.extend(range(cumulative_index, cumulative_index + len(features)))
+                all_categories.extend(features)
+
+                cumulative_index += len(features)
+                del ad
+
+                if counter % 30 == 0:
+                    elapsed_time = time.time() - start_time
+                    print(f"[INFO] Processed {counter}/{total_files_num} files. Time elapsed: {elapsed_time:.2f}s")
+
+            except Exception as e:
+                print(f"[ERROR] Failed processing {h5ad_file}: {str(e)}")
+                continue
+
+        # Single DataFrame creation (faster)
+        feature_idx_df = pd.DataFrame({
+            "index": all_indices,
+            "category": all_categories
+        })
+
+        cats = list(pd.unique(feature_idx_df["category"]))
+
+        elapsed_time = time.time() - start_time
+        print(f"[INFO] get_feature_idx_df completed in {elapsed_time:.2f} seconds.")
+        return feature_idx_df, cats
+
+    def get_feature_idx_df_old3(self):
         """
         Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
 
