@@ -58,6 +58,10 @@ class H5ADSampler:
         self.concat_anndata = concat_anndata
         self.prefix = prefix
         self.outdir = outdir
+        if not os.path.exists(self.outdir):
+            os.makedirs(self.outdir)
+        else:
+            print(f"{self.outdir} already exist.")
 
         self.total_cell_num = self.meta_df.shape[0]
 
