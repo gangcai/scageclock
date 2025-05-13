@@ -35,8 +35,8 @@ class TorchElasticNetAgeClock:
                  weight_decay: float = 0.001,
                  patience: int = 3,
                  scheduler_factor: float = 0.5,
-                 train_batch_iter_max: int = 100,  ## maximal number of iteration for the DataLoader during training
-                 predict_batch_iter_max: int = 20,
+                 train_batch_iter_max: int | None = 100,  ## maximal number of iteration for the DataLoader during training
+                 predict_batch_iter_max: int | None = 20,
                  device: str = "cpu",
                  log_file: str = "TorchElasticNetAgeClock_log.txt"):
 
@@ -236,8 +236,9 @@ class TorchElasticNetAgeClock:
                     ############### end of the loop when reaching train_batch_iter_max ###############
                     ## it will take too long to fully iterate the whole batches
                     ## only sampling maximal train_batch_iter_max batches for the training process
-                    if iter_num >= self.train_batch_iter_max:
-                        break
+                    if not self.train_batch_iter_max is None:
+                        if iter_num >= self.train_batch_iter_max:
+                            break
             ## end of batch loop
             print(f"training for epoch {epoch} completed, starting model validation")
             logging.info(f"training for epoch {epoch} completed, starting model validation")
@@ -304,8 +305,9 @@ class TorchElasticNetAgeClock:
                 soma_ids_all.extend(soma_ids.cpu().numpy())
                 test_samples_num += inputs.size(0)
                 iter_num += 1
-                if iter_num > self.predict_batch_iter_max:
-                    break
+                if not self.predict_batch_iter_max is None:
+                    if iter_num > self.predict_batch_iter_max:
+                        break
 
         avg_loss = total_loss / test_samples_num
         soma_ids_all = np.array(soma_ids_all).flatten()
