@@ -25,13 +25,14 @@ from .model.XGBoost import XGBoostAgeClock
 # TODO: optimize ad_dir_root and meta_file_path default settings
 # /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/
 # /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet
+# /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_valdata.parquet
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
                       feature_size: int = 19031,
                       suffix: str = "pb",
                       run_id: str = "v1",
                       ad_dir_root: str = "./db/",
-                      meta_file_path: str = "./db/",
+                      meta_file_path: str = "./db/meta.parquet", # meta file for predict_dataset
                       predict_dataset: str = "validation",
                       model_eval: bool = True, ## whether to evaluation of the model, such as based on validation datasets or testing datasets
                       validation_during_training: bool = True,
@@ -252,6 +253,17 @@ def training_pipeline(model_name: str = "GMA",
 
     ### saving the model #####
     print("start saving the model")
+    if model_name == "xgboost":
+        model_save_method = "joblib"
+        print(f"{model_name} only support joblib model saving")
+    elif model_name == "catboost":
+        model_save_method = "cbm"
+        print(f"{model_name} only support cbm model saving")
+    else:
+        if model_name not in ["stat_dict","pkl","joblib"]:
+            model_save_method = "stat_dict"
+            print(f"neural network model supports one of stat_dict, pkl or joblib format model saving")
+
     if model_save_method == "stat_dict":
         saved_model_file_name = os.path.join(outdir, prefix + ".pth")
         torch.save(age_clock.model.state_dict(), saved_model_file_name)
@@ -272,13 +284,13 @@ def training_pipeline(model_name: str = "GMA",
         cell_level_eval_metrics_dict, y_eval_pred, y_eval_true, soma_ids_all = age_clock.cell_level_test()
         print(f"cell id check: {soma_ids_all[:3]}")
         cell_level_m_df = pd.DataFrame(cell_level_eval_metrics_dict, index=[0])
-        cell_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_testing_metrics.tsv"), index=False, sep="\t")
+        cell_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_evaluation_metrics.tsv"), index=False, sep="\t")
 
         cell_level_eval_df = pd.DataFrame({"y_eval_true": y_eval_true,
                                            "y_eval_predicted": y_eval_pred,
                                            "cell_id": soma_ids_all, })
 
-        cell_level_eval_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_predictions.tsv"),sep="\t")
+        cell_level_eval_df.to_csv(os.path.join(outdir, f"{prefix}_cell_level_evaluation_predictions.tsv"),sep="\t")
 
         donor_true_ages, donor_predicted_ages, donor_level_eval_metrics_dict = donor_level_test(meta_file_path=meta_file_path,
                                                                                                 test_soma_joinids=soma_ids_all,
@@ -288,13 +300,13 @@ def training_pipeline(model_name: str = "GMA",
 
 
         donor_level_m_df = pd.DataFrame(donor_level_eval_metrics_dict, index=[0])
-        donor_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_eval_metrics.tsv"), index=False, sep="\t")
+        donor_level_m_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_evaluation_metrics.tsv"), index=False, sep="\t")
 
 
         donor_level_eval_df = pd.DataFrame({"y_eval_true": donor_true_ages,
                                                "y_eval_predicted": donor_predicted_ages})
 
-        donor_level_eval_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_predictions.tsv"),sep="\t")
+        donor_level_eval_df.to_csv(os.path.join(outdir, f"{prefix}_donor_level_evaluation_predictions.tsv"),sep="\t")
 
 
         papp(real_age=donor_true_ages.values,
@@ -324,6 +336,7 @@ def training_pipeline(model_name: str = "GMA",
     end_time = time.time()
     print("Training completed!")
     print(f"Time elapsed for the whole pipeline: {end_time - start_time} seconds")
+    return True
 
 ## given a single cell matrix inputs (numpy array or tensor), predict the donor/individual age of the cells
 # TODO: optimize
