@@ -206,10 +206,15 @@ def barplot(df,
             xlabel,
             ylabel,
             savefile: str | None = None,
-            ylim = (0,1),
+            ylim = None,
             figsize = (6,5)):
     # Plot the correlations
     plt.figure(figsize=figsize)
+
+    if ylim is None:
+        ylim_min = 0
+        ylim_max = max(df[y_col])*1.1
+        ylim = (ylim_min, ylim_max)
 
     # Subplot 1: Correlation
     sns.barplot(x=x_col, y=y_col, data=df, palette='viridis')
