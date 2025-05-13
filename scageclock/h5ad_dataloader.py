@@ -9,6 +9,7 @@ import torch
 import pandas as pd
 import glob
 import os
+import time
 
 from asttokens.util import replace
 
@@ -284,17 +285,20 @@ class BalancedH5ADDataLoader:
         Creates a DataFrame mapping feature indices to their values from multiple h5ad files.
 
         Returns:
-            pd.DataFrame: DataFrame with columns 'index' and 'category' and its statistics list.
+            pd.DataFrame: DataFrame with columns 'index' and 'category' and unique list of category
         """
-        from collections import Counter
-        from scipy.sparse import issparse
+
+        start_time = time.time()
 
         data = []
         cumulative_index = 0
-        category_counter = Counter()
 
+        total_files_num = len(self.file_paths)
+        print(f"total number of files: {total_files_num}")
+        counter = 0
         for h5ad_file in self.file_paths:
             try:
+                counter += 1
                 ad = sc.read_h5ad(h5ad_file, backed='r')
 
                 col_idx = self.balanced_feature_col - 1
@@ -303,19 +307,24 @@ class BalancedH5ADDataLoader:
 
                 # Read the entire column (sparse or dense)
                 col_data = ad[:, col_idx].X
-                if issparse(col_data):
-                    features = np.array(col_data.toarray()).flatten()
-                else:
-                    features = np.array(col_data).flatten()
+
+                features = np.array(col_data.toarray()).flatten()
+
 
                 indices = np.arange(cumulative_index, cumulative_index + len(features))
                 data.append(pd.DataFrame({"index": indices, "category": features}))
 
                 # Update category stats on the fly
-                category_counter.update(features)
                 cumulative_index += len(features)
 
                 del ad
+
+                if counter % 30 == 0:
+                    print(f"[INFO] Processed file: {counter} and the cumulative index at : {cumulative_index + 1}")
+                    print(f"[INFO] Progress: {counter / total_files_num}")
+                    end_time = time.time()
+                    elapsed_time = end_time - start_time
+                    print(f"[INFO] Time elapsed in {elapsed_time:.2f} seconds.")
 
             except Exception as e:
                 print(f"Error processing {h5ad_file}: {str(e)}")
@@ -324,9 +333,11 @@ class BalancedH5ADDataLoader:
         # Combine DataFrames only once
         feature_idx_df = pd.concat(data, ignore_index=True)
 
-        # Compute category stats from counter
-        cats = [k for k, _ in category_counter.most_common()]
+        cats = list(feature_idx_df["category"].unique())
 
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"[INFO] get_feature_idx_df executed in {elapsed_time:.2f} seconds.")
         return feature_idx_df, cats
 
     # TODO: slow and need to improve the speed
