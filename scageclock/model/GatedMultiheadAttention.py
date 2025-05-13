@@ -38,8 +38,8 @@ class GatedMultiheadAttentionAgeClock:
                  hidden_dim: int = 128,
                  num_heads: int = 8,
                  device: str = "cpu",
-                 train_batch_iter_max: int = 100,  ## maximal number of iteration for the DataLoader during training
-                 predict_batch_iter_max: int = 20,
+                 train_batch_iter_max: int | None = 100,  ## maximal number of iteration for the DataLoader during training
+                 predict_batch_iter_max: int | None = 20,
                  initial_model: str | None = None,
                  cat_feature_importance_method: str = "max",  # max, mean, sum
                  log_file: str = "log.txt"):
@@ -76,8 +76,8 @@ class GatedMultiheadAttentionAgeClock:
         :param hidden_dim: dimension of the hidden layer for the Fully Connected Network (FC)
         :param num_heads: number of heads for Multi-head Attention
         :param device: device used for training: cpu , cuda
-        :param train_batch_iter_max: early stop of batch iteration when reaching this number of batches for the training processes
-        :param predict_batch_iter_max: early stop of batch iteration when reaching this number of batches for the prediction processes
+        :param train_batch_iter_max: early stop of batch iteration when reaching this number of batches for the training processes, not used if None
+        :param predict_batch_iter_max: early stop of batch iteration when reaching this number of batches for the prediction processes, not used if None
         :param initial_model: default None. Load the trained model as the initial model.
         :param log_file: log file
         """
@@ -291,8 +291,9 @@ class GatedMultiheadAttentionAgeClock:
                     ############### end of the loop when reaching train_batch_iter_max ###############
                     ## it will take too long to fully iterate the whole batches
                     ## only sampling maximal train_batch_iter_max batches for the training process
-                    if iter_num >= self.train_batch_iter_max:
-                        break
+                    if not self.train_batch_iter_max is None:
+                        if iter_num >= self.train_batch_iter_max:
+                            break
             ## end of batch loop
             print(f"training for epoch {epoch} completed")
             print(f"iter_num: {iter_num}")
@@ -361,8 +362,9 @@ class GatedMultiheadAttentionAgeClock:
                 soma_ids_all.extend(soma_ids.cpu().numpy())
                 test_samples_num += inputs.size(0)
                 iter_num += 1
-                if iter_num >= self.predict_batch_iter_max:
-                    break
+                if not self.predict_batch_iter_max is None:
+                    if iter_num >= self.predict_batch_iter_max:
+                        break
 
         avg_loss = total_loss / test_samples_num
 
