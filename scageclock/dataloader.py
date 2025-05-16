@@ -16,6 +16,7 @@ class BasicDataLoader:
                  cell_id: str = "soma_joinid",
                  loader_method: str = "scageclock",
                  dataset_folder_dict=None,
+                 balanced_dataloader_parameters: dict | None = None,
                  **kwargs
                  ):
         """
@@ -31,8 +32,9 @@ class BasicDataLoader:
         :param num_workers: number of parallel jobs for Data Loading
         :param age_column: age column name in the adata.obs
         :param cell_id: cell id column name in the adata.obs # default using CELLxGENE soma_joinid
-        :param loader_method: loader method used: "scageclock" or "scageclock_balanced"
+        :param loader_method: loader method used: "scageclock" or "scageclock_balanced" (only for training datasets)
         :param dataset_folder_dict: the folder name for each type of datasets, default: {"training": "train", "validation": "val", "testing": "test"}
+        :param balanced_dataloader_parameters: dictionary for h5ad_dataloader BalancedH5ADDataLoader
         """
 
         # default value for dataset_folder_dict if it is None
@@ -64,6 +66,8 @@ class BasicDataLoader:
         self.dataloader_val = None
         self.dataloader_test = None
 
+        self.balanced_dataloader_parameters = balanced_dataloader_parameters
+
         ## loading the datasets
         self._load_data(**kwargs)
 
@@ -73,6 +77,7 @@ class BasicDataLoader:
     def _load_data(self, **kwargs):
         check_tag = False
         if "training" in self.dataset_folder_dict:
+
             self.dataloader_train = get_data_loader(ad_files_path=os.path.join(self.anndata_dir_root, self.dataset_folder_dict["training"]),
                                                     batch_size=self.batch_size_train,
                                                     shuffle=self.shuffle,
@@ -80,6 +85,7 @@ class BasicDataLoader:
                                                     cell_id=self.cell_id,
                                                     age_column=self.age_column,
                                                     loader_method=self.loader_method,
+                                                    balanced_dataloader_parameters = self.balanced_dataloader_parameters,
                                                     **kwargs
                                                     )
             print(f"training datasets are loaded from {self.dataset_folder_dict["training"]}")
@@ -92,7 +98,7 @@ class BasicDataLoader:
                                                   num_workers=self.num_workers,
                                                   cell_id=self.cell_id,
                                                   age_column=self.age_column,
-                                                  loader_method=self.loader_method,
+                                                  loader_method="scageclock",
                                                   **kwargs
                                                   )
             print(f"validation datasets are loaded from {self.dataset_folder_dict["validation"]}")
@@ -105,7 +111,7 @@ class BasicDataLoader:
                                                    num_workers=self.num_workers,
                                                    cell_id=self.cell_id,
                                                    age_column=self.age_column,
-                                                   loader_method=self.loader_method,
+                                                   loader_method="scageclock",
                                                    **kwargs
                                                    )
             print(f"testing datasets are loaded from {self.dataset_folder_dict["testing"]}")
@@ -130,6 +136,7 @@ def get_data_loader(ad_files_path: str,
                     age_column: str = "age",
                     cell_id: str = "soma_joinid",
                     loader_method: str = "scageclock",
+                    balanced_dataloader_parameters: dict | None = None,
                     **kwargs):
     """
     Given the folder path for the .h5ad files, return torch DataLoader
@@ -141,6 +148,7 @@ def get_data_loader(ad_files_path: str,
     :param age_column: the column name for the age
     :param cell_id: the unique cell ID, which is used to trace back to the donor information
     :param loader_method: "scageclock" or "scageclock_balanced"
+    :param balanced_dataloader_parameters: dictionary for h5ad_dataloader BalancedH5ADDataLoader (on work for when loader_method == 'scageclock_balanced')
     :return: torch DataLoader
     """
     if not loader_method in ["scageclock","scageclock_balanced"]:
@@ -159,10 +167,34 @@ def get_data_loader(ad_files_path: str,
                                     )
         return dataloader
     elif loader_method == 'scageclock_balanced':
-        dataloader = BalancedH5ADDataLoader(file_paths=ad_files,
+        if balanced_dataloader_parameters is None:
+            raise ValueError("balanced_dataloader_parameters is not set!")
+
+        if not "batch_iter_max" in balanced_dataloader_parameters:
+            balanced_dataloader_parameters["batch_iter_max"] = 10000
+
+        if not "meta_cell_id_column" in balanced_dataloader_parameters:
+            balanced_dataloader_parameters["meta_cell_id_column"] = "soma_joinid"
+
+        if not "index_cell_id_column" in balanced_dataloader_parameters:
+            balanced_dataloader_parameters["index_cell_id_column"] = "cell_id"
+
+        if not "meta_balanced_column" in balanced_dataloader_parameters:
+            balanced_dataloader_parameters["meta_balanced_column"] = "tissue_general"
+
+        if not "h5ad_cell_id_column" in balanced_dataloader_parameters:
+            balanced_dataloader_parameters["h5ad_cell_id_column"] = "soma_joinid"
+
+        dataloader = BalancedH5ADDataLoader(h5ad_files_folder_path=balanced_dataloader_parameters["h5ad_files_folder_path"],
+                                            h5ad_files_index_file=balanced_dataloader_parameters["h5ad_files_index_file"],
+                                            h5ad_files_meta_file=balanced_dataloader_parameters["h5ad_files_meta_file"],
                                             batch_size=batch_size,
                                             age_column=age_column,
-                                            cell_id=cell_id,
+                                            h5ad_cell_id_column=balanced_dataloader_parameters["h5ad_cell_id_column"],
+                                            index_cell_id_column=balanced_dataloader_parameters["index_cell_id_column"],
+                                            meta_cell_id_column=balanced_dataloader_parameters["meta_cell_id_column"],
+                                            meta_balanced_column=balanced_dataloader_parameters["meta_balanced_column"],
+                                            batch_iter_max=balanced_dataloader_parameters["batch_iter_max"],
                                             **kwargs
                                             )
         return dataloader
