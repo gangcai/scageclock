@@ -200,8 +200,160 @@ class H5ADDataLoader:
     def __len__(self):
         return self.total_samples
 
-
 class BalancedH5ADDataLoader:
+
+    def __init__(self,
+                 h5ad_files_folder_path: str,
+                 h5ad_files_index_file: str,
+                 h5ad_files_meta_file: str,
+                 index_file_format: str = "parquet",
+                 meta_file_format: str = "parquet",
+                 age_column: str = "age",
+                 h5ad_cell_id_column: str = "soma_joinid", # cell id column name in anndata.obs
+                 index_cell_id_column: str = "cell_id",  # cell id column name in h5ad_files_index_file
+                 meta_cell_id_column: str = "soma_joinid", # cell id column name in h5ad_files_meta_file
+                 meta_balanced_column: str = "tissue_general", # column used for balanced data retrieving (in h5ad_files_meta_file)
+                 batch_size: int = 1000,
+                 batch_iter_max: int = 10000,
+                 ):
+
+        self.h5ad_files_folder_path = h5ad_files_folder_path
+        self.h5ad_files_index_file = h5ad_files_index_file
+        self.h5ad_files_meta_file = h5ad_files_meta_file
+        self.index_file_format = index_file_format
+        self.meta_file_format = meta_file_format
+        self.age_column = age_column
+        self.h5ad_cell_id_column = h5ad_cell_id_column
+        self.index_cell_id_column = index_cell_id_column
+        self.meta_cell_id_column = meta_cell_id_column
+        self.meta_balanced_column = meta_balanced_column
+
+
+        self.batch_size = batch_size
+        self.batch_iter_max = batch_iter_max
+
+
+        if index_file_format == "parquet":
+            index_df = pd.read_parquet(self.h5ad_files_index_file)
+        else:
+            raise ValueError("Only parquet format is supported for index file")
+
+        if meta_file_format == "parquet":
+            meta_df = pd.read_parquet(self.h5ad_files_meta_file)
+        else:
+            raise ValueError("Only parquet format is support for meta file")
+
+        ## process the index and meta file
+        self.meta_index_df = pd.merge(index_df,
+                                 meta_df[[self.meta_cell_id_column,self.meta_balanced_column]],
+                                 left_on=self.index_cell_id_column,
+                                 right_on=self.meta_cell_id_column)
+
+        # Store the total number of samples across all .h5ad files
+        self.total_samples = len(self.meta_index_df)
+        self.batch_iter_start = 0
+
+        self.cats = list(self.meta_index_df[self.meta_balanced_column].unique())
+
+        self.cats_num = len(self.cats)
+        self.mini_batch_size = self.batch_size // self.cats_num  ## batch size for each selected feature category
+
+    def __iter__(self):
+        self.batch_iter_start = 0
+        return self
+
+    def __next__(self):
+        if self.batch_iter_start < self.batch_iter_max:
+            exp_arr, age_soma_arr = self.sample_batch()
+            self.batch_iter_start += 1
+            return torch.tensor(exp_arr, dtype=torch.float32), torch.tensor(age_soma_arr, dtype=torch.int32)
+        else:
+            raise StopIteration
+
+    def sample_batch(self):
+        batch_index_list = self.balanced_indices_sampling()
+        files2index = self._get_file_indices(batch_index_list)
+
+        exp_arr = None
+        age_soma_arr = None
+        i = 0
+        for file_path in files2index.keys():
+            i += 1
+            index_selected = files2index[file_path]
+            sample_X, age_soma = self._process_h5ad_file(file_path=file_path,
+                                                         index_selected=index_selected)
+            if i == 1:
+                exp_arr = sample_X
+                age_soma_arr = age_soma
+            else:
+                exp_arr = np.vstack((exp_arr, sample_X))
+                age_soma_arr = np.vstack((age_soma_arr, age_soma))
+
+        return exp_arr, age_soma_arr
+
+
+    def balanced_indices_sampling(self):
+        sampled_idx = self._index_sampling(batch_size=self.mini_batch_size)
+
+        sampled_len = len(sampled_idx)
+
+        if sampled_len == self.batch_size:
+            return sampled_idx
+        elif sampled_len > self.batch_size:
+            raise ValueError(f"sampled length ({sampled_len}) is larger than the batch size ({self.batch_size})")
+        else:
+            remained_sample_size = self.batch_size - sampled_len
+            feature_idx_df_remained = self.meta_index_df[~self.meta_index_df["global_index"].isin(sampled_idx)]
+            remained_sampled = feature_idx_df_remained.sample(n=remained_sample_size,replace=False)
+            remained_idx = list(remained_sampled["global_index"])
+            sampled_idx = sampled_idx + remained_idx
+            return sampled_idx
+
+    def _index_sampling(self,  batch_size):
+        sampled_idx = []
+        for cat in self.cats:
+            feature_idx_df_s = self.meta_index_df[self.meta_index_df[self.meta_balanced_column] == cat]
+            count = feature_idx_df_s.shape[0]
+            if count < batch_size:
+                sample_df = feature_idx_df_s
+            else:
+                sample_df = feature_idx_df_s.sample(batch_size)
+            idx = list(sample_df["global_index"])
+            sampled_idx = sampled_idx + idx
+        return sampled_idx
+
+    ## given a list of index, return the dictionary: filename : list of local-indices
+    def _get_file_indices(self,
+                          index_list: List[int]):
+        file2index = {}
+        meta_index_df_s = self.meta_index_df[self.meta_index_df["global_index"].isin(index_list)]
+        filenames = list(meta_index_df_s["file_name"].unique())
+
+        for filename in filenames:
+            meta_index_df_s2 = meta_index_df_s[meta_index_df_s["file_name"] == filename]
+
+            meta_index_df_s3 = meta_index_df_s2[meta_index_df_s2["global_index"].isin(index_list)]
+
+            local_index = meta_index_df_s3["local_index"]
+
+            filename_full_path = os.path.join(self.h5ad_files_folder_path, filename)
+            file2index[filename_full_path] = local_index
+        return file2index
+
+    def _process_h5ad_file(self, file_path, index_selected):
+        ad = sc.read_h5ad(file_path, backed="r")
+        ad_select = ad[index_selected]
+        sample_X = ad_select.X.toarray()
+        age_soma = ad_select.obs[[self.age_column, self.h5ad_cell_id_column]].values
+        age_soma = np.array(age_soma, dtype=np.int32)
+        return sample_X, age_soma
+
+    def __len__(self):
+        return self.total_samples
+
+
+# TODO: index the .h5ad files, cell_id, file_name, local_index, global_index
+class BalancedH5ADDataLoader_old:
 
     def __init__(self,
                  file_paths: List[str],
@@ -470,7 +622,6 @@ def fully_loaded(h5ad_file_path: str,
 
 
 def get_cell_ids(h5ad_file_path: str,
-                 age_column: str = "age",
                  cell_id: str = "soma_joinid",
                  ):
     ad_files = glob.glob(os.path.join(h5ad_file_path, "*.h5ad"))
@@ -482,6 +633,33 @@ def get_cell_ids(h5ad_file_path: str,
         series_list.append(cell_ids)
     result = pd.concat(series_list)
     return list(result)
+
+def get_cell_id_index(h5ad_file_path: str,
+                      cell_id: str = "soma_joinid",):
+    ad_files = glob.glob(os.path.join(h5ad_file_path, "*.h5ad"))
+
+    global_index = 0
+    data = []
+    for ad_file in ad_files:
+        ad = sc.read_h5ad(ad_file, backed="r")
+        cell_ids = list(ad.obs[cell_id])
+
+        num_cell = len(cell_ids)
+        indices = np.arange(global_index, global_index + num_cell)
+        global_index += num_cell
+
+        local_indices = np.arange(0,num_cell)
+
+        file_name = ad_file.split("/")[-1]
+
+        data.append(pd.DataFrame({"cell_id": cell_ids,
+                                  "global_index": indices,
+                                  "local_index": local_indices,
+                                  "file_name": [file_name] * num_cell
+                                  }))
+
+    result = pd.concat(data)
+    return result
 
 
 
