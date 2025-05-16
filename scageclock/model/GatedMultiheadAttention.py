@@ -1,3 +1,5 @@
+import os.path
+
 import torch
 import torch.nn as nn
 from ..dataloader import BasicDataLoader
@@ -6,7 +8,7 @@ import logging
 from ..utility import get_validation_metrics
 import numpy as np
 
-## TODO: unify parameters for different methods
+# TODO: add model checkpoint
 class GatedMultiheadAttentionAgeClock:
 
     def __init__(self,
@@ -42,6 +44,10 @@ class GatedMultiheadAttentionAgeClock:
                  predict_batch_iter_max: int | None = 20,
                  initial_model: str | None = None,
                  cat_feature_importance_method: str = "max",  # max, mean, sum
+                 balanced_dataloader_parameters: dict | None = None,
+                 save_checkpoint: bool = False,
+                 checkpoint_outdir: str = "./checkpoints_saved", # only used when save_checkpoint is true
+                 checkpoint_file_prefix: str = "GMA",
                  log_file: str = "log.txt"):
         """
         Aging Clock based on Gated (Elastic Net) Multi-head Attention Neural Network
@@ -79,6 +85,10 @@ class GatedMultiheadAttentionAgeClock:
         :param train_batch_iter_max: early stop of batch iteration when reaching this number of batches for the training processes, not used if None
         :param predict_batch_iter_max: early stop of batch iteration when reaching this number of batches for the prediction processes, not used if None
         :param initial_model: default None. Load the trained model as the initial model.
+        :param balanced_dataloader_parameters: dictionary for h5ad_dataloader BalancedH5ADDataLoader
+        :param save_checkpoint: whether to save the checkpoints for each epoch
+        :param checkpoint_outdir: path to the outputs of checkpoint files, only works when save_checkpoint is True
+        :param checkpoint_file_prefix: prefix for the output files of checkpoint
         :param log_file: log file
         """
 
@@ -134,6 +144,16 @@ class GatedMultiheadAttentionAgeClock:
         self.initial_model = initial_model
         self.log_file = log_file
 
+        self.save_checkpoint = save_checkpoint
+        self.checkpoint_outdir = checkpoint_outdir
+        self.checkpoint_file_prefix = checkpoint_file_prefix
+
+        if self.save_checkpoint:
+            if not os.path.exists(self.checkpoint_outdir):
+                os.makedirs(self.checkpoint_outdir)
+
+        self.balanced_dataloader_parameters = balanced_dataloader_parameters
+
         # Configure logging
         logging.basicConfig(filename=self.log_file, level=logging.INFO)
 
@@ -149,7 +169,8 @@ class GatedMultiheadAttentionAgeClock:
                                           age_column=self.age_column,
                                           cell_id=self.cell_id,
                                           loader_method=self.loader_method,
-                                          dataset_folder_dict=self.dataset_folder_dict
+                                          dataset_folder_dict=self.dataset_folder_dict,
+                                          balanced_dataloader_parameters=self.balanced_dataloader_parameters
                                           )
 
 
@@ -316,6 +337,15 @@ class GatedMultiheadAttentionAgeClock:
                 self.scheduler.step(avg_val_loss)
             else:
                 print("warning: the validation_during_training is set to be False, and the learning rate scheduler is not used.")
+
+            if self.save_checkpoint:
+                cp_file = os.path.join(self.checkpoint_outdir, f"{self.checkpoint_file_prefix}_epoch{epoch}.pth" )
+                # saving the checkpoint
+                torch.save({'epoch': epoch,
+                            'model_state_dict': self.model.state_dict(),
+                            'optimizer_state_dict': self.optimizer.state_dict(),
+                            'train_avg_loss': avg_train_loss},
+                           cp_file)
         ## end of epoch loop
 
         return epoch_train_loss_list, epoch_val_loss_list, all_batch_train_loss_list, all_batch_val_loss_list
