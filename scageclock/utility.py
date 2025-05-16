@@ -21,6 +21,8 @@ def donor_level_test(meta_file_path: str,
                      test_soma_joinids: List,
                      y_test_true: List,
                      y_test_predict: List,
+                     cell_id_column: str = "soma_joinid",
+                     donor_id_column: str = "donor_id_general",
                      method: str = "mean"):
 
     if not method in ["mean","median"]:
@@ -31,7 +33,7 @@ def donor_level_test(meta_file_path: str,
     test_donor_ids = []
     for test_soma_id in test_soma_joinids:
         test_soma_id = int(test_soma_id)
-        donor_id_general = meta_df[meta_df["soma_joinid"] == int(test_soma_id)]["donor_id_general"].values[0]
+        donor_id_general = meta_df[meta_df[cell_id_column] == int(test_soma_id)][donor_id_column].values[0]
         test_donor_ids.append(donor_id_general)
 
     test_donor_df = pd.DataFrame({"donor": test_donor_ids,
@@ -54,7 +56,7 @@ def donor_level_test(meta_file_path: str,
 
 def get_validation_metrics(y_true,
                            y_pred, 
-                           print_metrics=True):
+                           print_metrics=False):
     """
     Get the validation metrics for aging prediction
     :param y_true: List of true age values
@@ -67,8 +69,7 @@ def get_validation_metrics(y_true,
     mse = mean_squared_error(y_true, y_pred)
     rmse = np.sqrt(mse)
     mae = mean_absolute_error(y_true, y_pred)
-    r2 = r2_score(y_true, y_pred)
-    r2_rev = r2_score(y_pred,y_true)
+    r2 = r2_score(y_true=y_true, y_pred=y_pred)
     correlation, p_value = scipy.stats.pearsonr(y_pred, y_true)
 
     rmse = float(rmse)
@@ -80,15 +81,13 @@ def get_validation_metrics(y_true,
         print(f"Root Mean Squared Error (RMSE): {rmse}")
         print(f"Mean Absolute Error (MAE): {mae}")
         print(f"R^2 Score: {r2}")
-        print(f"R^2 Score (rev): {r2_rev}")
         print("Pearson correlation coefficient:", correlation)
         print("P-value:", p_value)
 
     results = {"MSE":mse,
               "RMSE":rmse,
               "MAE":mae,
-              "R2":r2,
-              "R2_reverse":r2_rev,
+              "R2_Score":r2,
               "Pearson's r": correlation,
               "Pearson P value": p_value}
     return results
