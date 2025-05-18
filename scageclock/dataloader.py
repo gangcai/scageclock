@@ -17,6 +17,9 @@ class BasicDataLoader:
                  loader_method: str = "scageclock",
                  dataset_folder_dict=None,
                  balanced_dataloader_parameters: dict | None = None,
+                 K_fold_mode: bool = False,
+                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
+                 K_fold_val: tuple[str] = ("Fold5"),
                  **kwargs
                  ):
         """
@@ -35,10 +38,15 @@ class BasicDataLoader:
         :param loader_method: loader method used: "scageclock" or "scageclock_balanced" (only for training datasets)
         :param dataset_folder_dict: the folder name for each type of datasets, default: {"training": "train", "validation": "val", "testing": "test"}
         :param balanced_dataloader_parameters: dictionary for h5ad_dataloader BalancedH5ADDataLoader
+        :param K_fold_mode: whether to use K_fold mode. Each-fold datasets should be under one folder
+        :param K_fold_train: The K_fold folders under ad_files_path that are used for training
+        :param K_fold_val: The K_fold folder under ad_files_path that are sued for validation
         """
 
         # default value for dataset_folder_dict if it is None
-        if dataset_folder_dict is None:
+        if K_fold_mode and (dataset_folder_dict is None):
+            dataset_folder_dict = {"training_validation": "train_val"}
+        elif dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
 
         self.anndata_dir_root = anndata_dir_root
@@ -61,6 +69,10 @@ class BasicDataLoader:
 
         self.dataset_folder_dict = dataset_folder_dict
 
+        self.K_fold_train = K_fold_train
+        self.K_fold_val = K_fold_val
+        self.K_fold_mode = K_fold_mode
+
         ## initiate dataloader for
         self.dataloader_train = None
         self.dataloader_val = None
@@ -76,6 +88,41 @@ class BasicDataLoader:
 
     def _load_data(self, **kwargs):
         check_tag = False
+        if "training_validation" in self.dataset_folder_dict:
+            ad_files_path = os.path.join(self.anndata_dir_root, self.dataset_folder_dict["training_validation"])
+            if self.K_fold_mode:
+                self.dataloader_train = get_data_loader(ad_files_path=ad_files_path,
+                                                        batch_size=self.batch_size_train,
+                                                        shuffle=self.shuffle,
+                                                        num_workers=self.num_workers,
+                                                        cell_id=self.cell_id,
+                                                        age_column=self.age_column,
+                                                        loader_method=self.loader_method,
+                                                        balanced_dataloader_parameters=self.balanced_dataloader_parameters,
+                                                        sub_folders= self.K_fold_train,
+                                                        )
+
+                self.dataloader_val = get_data_loader(ad_files_path=ad_files_path,
+                                                        batch_size=self.batch_size_train,
+                                                        shuffle=self.shuffle,
+                                                        num_workers=self.num_workers,
+                                                        cell_id=self.cell_id,
+                                                        age_column=self.age_column,
+                                                        loader_method=self.loader_method,
+                                                        balanced_dataloader_parameters=self.balanced_dataloader_parameters,
+                                                        sub_folders=self.K_fold_val,
+                                                        )
+            else:
+                self.dataloader_train = get_data_loader(ad_files_path=ad_files_path,
+                                                        batch_size=self.batch_size_train,
+                                                        shuffle=self.shuffle,
+                                                        num_workers=self.num_workers,
+                                                        cell_id=self.cell_id,
+                                                        age_column=self.age_column,
+                                                        loader_method=self.loader_method,
+                                                        balanced_dataloader_parameters=self.balanced_dataloader_parameters,
+                                                        sub_folders= self.K_fold_train,
+                                                        )
         if "training" in self.dataset_folder_dict:
 
             self.dataloader_train = get_data_loader(ad_files_path=os.path.join(self.anndata_dir_root, self.dataset_folder_dict["training"]),
@@ -137,6 +184,7 @@ def get_data_loader(ad_files_path: str,
                     cell_id: str = "soma_joinid",
                     loader_method: str = "scageclock",
                     balanced_dataloader_parameters: dict | None = None,
+                    sub_folders: tuple[str] | None = None,
                     **kwargs):
     """
     Given the folder path for the .h5ad files, return torch DataLoader
@@ -149,13 +197,19 @@ def get_data_loader(ad_files_path: str,
     :param cell_id: the unique cell ID, which is used to trace back to the donor information
     :param loader_method: "scageclock" or "scageclock_balanced"
     :param balanced_dataloader_parameters: dictionary for h5ad_dataloader BalancedH5ADDataLoader (on work for when loader_method == 'scageclock_balanced')
+    :param sub_folders: use the .h5ad files under sub_folders
     :return: torch DataLoader
     """
     if not loader_method in ["scageclock","scageclock_balanced"]:
         msg = "Error: loader_method can only be in ['scageclock','scageclock_balanced']"
         raise ValueError(msg)
-
-    ad_files = get_h5ad_files(ad_files_path)
+    if sub_folders is None:
+        ad_files = get_h5ad_files(ad_files_path)
+    else:
+        ad_files = []
+        for sub_folder in sub_folders:
+            sub_folder_ad_files = get_h5ad_files(os.path.join(ad_files_path, sub_folder))
+            ad_files += sub_folder_ad_files
 
     if loader_method == 'scageclock':
         dataloader = H5ADDataLoader(file_paths=ad_files,
@@ -185,6 +239,10 @@ def get_data_loader(ad_files_path: str,
         if not "h5ad_cell_id_column" in balanced_dataloader_parameters:
             balanced_dataloader_parameters["h5ad_cell_id_column"] = "soma_joinid"
 
+        if sub_folders is None:
+            is_meta_index_file_name_full_path = False
+        else:
+            is_meta_index_file_name_full_path = True
         dataloader = BalancedH5ADDataLoader(h5ad_files_folder_path=balanced_dataloader_parameters["h5ad_files_folder_path"],
                                             h5ad_files_index_file=balanced_dataloader_parameters["h5ad_files_index_file"],
                                             h5ad_files_meta_file=balanced_dataloader_parameters["h5ad_files_meta_file"],
@@ -195,6 +253,7 @@ def get_data_loader(ad_files_path: str,
                                             meta_cell_id_column=balanced_dataloader_parameters["meta_cell_id_column"],
                                             meta_balanced_column=balanced_dataloader_parameters["meta_balanced_column"],
                                             batch_iter_max=balanced_dataloader_parameters["batch_iter_max"],
+                                            is_meta_index_file_name_full_path=is_meta_index_file_name_full_path,
                                             **kwargs
                                             )
         return dataloader
