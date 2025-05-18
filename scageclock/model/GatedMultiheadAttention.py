@@ -45,6 +45,9 @@ class GatedMultiheadAttentionAgeClock:
                  initial_model: str | None = None,
                  cat_feature_importance_method: str = "max",  # max, mean, sum
                  balanced_dataloader_parameters: dict | None = None,
+                 K_fold_mode: bool = False,
+                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
+                 K_fold_val: tuple[str] = ("Fold5"),
                  save_checkpoint: bool = False,
                  checkpoint_outdir: str = "./checkpoints_saved", # only used when save_checkpoint is true
                  checkpoint_file_prefix: str = "GMA",
@@ -86,6 +89,9 @@ class GatedMultiheadAttentionAgeClock:
         :param predict_batch_iter_max: early stop of batch iteration when reaching this number of batches for the prediction processes, not used if None
         :param initial_model: default None. Load the trained model as the initial model.
         :param balanced_dataloader_parameters: dictionary for h5ad_dataloader BalancedH5ADDataLoader
+        :param K_fold_mode: whether to use K_fold mode. Each-fold datasets should be under one folder
+        :param K_fold_train: The K_fold folders under ad_files_path that are used for training
+        :param K_fold_val: The K_fold folder under ad_files_path that are sued for validation
         :param save_checkpoint: whether to save the checkpoints for each epoch
         :param checkpoint_outdir: path to the outputs of checkpoint files, only works when save_checkpoint is True
         :param checkpoint_file_prefix: prefix for the output files of checkpoint
@@ -99,7 +105,9 @@ class GatedMultiheadAttentionAgeClock:
             cat_card_list = [14, 219, 39, 3]
 
         # default value for dataset_folder_dict if it is None
-        if dataset_folder_dict is None:
+        if K_fold_mode and (dataset_folder_dict is None):
+            dataset_folder_dict = {"training_validation": "train_val"}
+        elif dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
 
         self.anndata_dir_root = anndata_dir_root
@@ -136,6 +144,9 @@ class GatedMultiheadAttentionAgeClock:
 
         self.cat_feature_importance_method = cat_feature_importance_method
 
+        self.K_fold_train = K_fold_train
+        self.K_fold_val = K_fold_val
+
         ## training loss metrics
         self.epoch_train_loss_list = []
         self.epoch_val_loss_list = []
@@ -143,6 +154,7 @@ class GatedMultiheadAttentionAgeClock:
         self.batch_val_loss_list = []
         self.initial_model = initial_model
         self.log_file = log_file
+
 
         self.save_checkpoint = save_checkpoint
         self.checkpoint_outdir = checkpoint_outdir
@@ -170,7 +182,10 @@ class GatedMultiheadAttentionAgeClock:
                                           cell_id=self.cell_id,
                                           loader_method=self.loader_method,
                                           dataset_folder_dict=self.dataset_folder_dict,
-                                          balanced_dataloader_parameters=self.balanced_dataloader_parameters
+                                          balanced_dataloader_parameters=self.balanced_dataloader_parameters,
+                                          K_fold_mode=K_fold_mode,
+                                          K_fold_train=K_fold_train,
+                                          K_fold_val=K_fold_val
                                           )
 
 
