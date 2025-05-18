@@ -215,6 +215,7 @@ class BalancedH5ADDataLoader:
                  meta_balanced_column: str = "tissue_general", # column used for balanced data retrieving (in h5ad_files_meta_file)
                  batch_size: int = 1000,
                  batch_iter_max: int = 10000,
+                 is_meta_index_file_name_full_path: bool = False, ## whether the file_name is recorded as a full path file name
                  ):
 
         self.h5ad_files_folder_path = h5ad_files_folder_path
@@ -231,6 +232,7 @@ class BalancedH5ADDataLoader:
 
         self.batch_size = batch_size
         self.batch_iter_max = batch_iter_max
+        self.is_meta_index_file_name_full_path = is_meta_index_file_name_full_path
 
 
         if index_file_format == "parquet":
@@ -336,7 +338,10 @@ class BalancedH5ADDataLoader:
 
             local_index = meta_index_df_s3["local_index"]
 
-            filename_full_path = os.path.join(self.h5ad_files_folder_path, filename)
+            if self.is_meta_index_file_name_full_path:
+                filename_full_path = filename
+            else:
+                filename_full_path = os.path.join(self.h5ad_files_folder_path, filename)
             file2index[filename_full_path] = local_index
         return file2index
 
@@ -635,8 +640,17 @@ def get_cell_ids(h5ad_file_path: str,
     return list(result)
 
 def get_cell_id_index(h5ad_file_path: str,
-                      cell_id: str = "soma_joinid",):
-    ad_files = glob.glob(os.path.join(h5ad_file_path, "*.h5ad"))
+                      cell_id: str = "soma_joinid",
+                      sub_folders: tuple[str] | None = None,
+                      is_file_name_full_path: bool = False,):
+    if sub_folders is None:
+        ad_files = glob.glob(os.path.join(h5ad_file_path, "*.h5ad"))
+    else:
+        is_file_name_full_path = True
+        ad_files = []
+        for sub_f in sub_folders:
+            this_ad_files = glob.glob(os.path.join(h5ad_file_path,sub_f, "*.h5ad"))
+            ad_files += this_ad_files
 
     global_index = 0
     data = []
@@ -650,7 +664,10 @@ def get_cell_id_index(h5ad_file_path: str,
 
         local_indices = np.arange(0,num_cell)
 
-        file_name = ad_file.split("/")[-1]
+        if is_file_name_full_path:
+            file_name = ad_file
+        else:
+            file_name = ad_file.split("/")[-1]
 
         data.append(pd.DataFrame({"cell_id": cell_ids,
                                   "global_index": indices,
