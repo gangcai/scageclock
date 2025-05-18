@@ -37,6 +37,9 @@ class TorchElasticNetAgeClock:
                  scheduler_factor: float = 0.5,
                  train_batch_iter_max: int | None = 100,  ## maximal number of iteration for the DataLoader during training
                  predict_batch_iter_max: int | None = 20,
+                 K_fold_mode: bool = False,
+                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
+                 K_fold_val: tuple[str] = ("Fold5"),
                  device: str = "cpu",
                  log_file: str = "TorchElasticNetAgeClock_log.txt"):
 
@@ -46,7 +49,9 @@ class TorchElasticNetAgeClock:
             cat_card_list = [14, 219, 39, 3]
 
         # default value for dataset_folder_dict if it is None
-        if dataset_folder_dict is None:
+        if K_fold_mode and (dataset_folder_dict is None):
+            dataset_folder_dict = {"training_validation": "train_val"}
+        elif dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
 
         self.anndata_dir_root = anndata_dir_root
@@ -97,7 +102,11 @@ class TorchElasticNetAgeClock:
                                                           shuffle=self.shuffle,
                                                           num_workers=self.num_workers,
                                                           loader_method=self.loader_method,
-                                                          dataset_folder_dict=self.dataset_folder_dict)
+                                                          dataset_folder_dict=self.dataset_folder_dict,
+                                                          K_fold_mode=K_fold_mode,
+                                                          K_fold_train=K_fold_train,
+                                                          K_fold_val=K_fold_val
+                                                          )
 
         ## checking for validation
         if self.validation_during_training:
