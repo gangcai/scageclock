@@ -57,12 +57,17 @@ def training_pipeline(model_name: str = "GMA",
                       boost_iteration: int = 100,
                       cat_used_ram_limit: str = "100GB",
                       cat_n_embed: int = 4,  ## number of embedding for the categorical feature, only used in eGMA
+                      K_fold_mode: bool = False,
+                      K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
+                      K_fold_val: tuple[str] = ("Fold5"),
                       **kwargs
                       ):
     start_time = time.time()
 
     # default value for dataset_folder_dict if it is None
-    if dataset_folder_dict is None:
+    if K_fold_mode and (dataset_folder_dict is None):
+        dataset_folder_dict = {"training_validation": "train_val"}
+    elif dataset_folder_dict is None:
         dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
 
     ## checking the inputs
@@ -112,6 +117,9 @@ def training_pipeline(model_name: str = "GMA",
                         log_file=log_file,
                         learning_rate=learning_rate,
                         weight_decay=nn_weight_decay,
+                        K_fold_mode=K_fold_mode,
+                        K_fold_train=K_fold_train,
+                        K_fold_val=K_fold_val,
                         **kwargs)
     elif model_name == "catboost":
         if device == "cuda":
@@ -176,6 +184,9 @@ def training_pipeline(model_name: str = "GMA",
                                             log_file=log_file,
                                             learning_rate=learning_rate,
                                             weight_decay=nn_weight_decay,
+                                            K_fold_mode=K_fold_mode,
+                                            K_fold_train=K_fold_train,
+                                            K_fold_val=K_fold_val,
                                             **kwargs)
     elif model_name == "MLP":
         age_clock = MLPAgeClock(anndata_dir_root=ad_dir_root,
@@ -195,6 +206,9 @@ def training_pipeline(model_name: str = "GMA",
                                 log_file=log_file,
                                 learning_rate=learning_rate,
                                 weight_decay=nn_weight_decay,
+                                K_fold_mode=K_fold_mode,
+                                K_fold_train=K_fold_train,
+                                K_fold_val=K_fold_val,
                                 **kwargs)
     else:
         raise ValueError(f"Input model not supported: {model_name}!")
