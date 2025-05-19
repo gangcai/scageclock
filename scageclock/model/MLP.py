@@ -97,22 +97,22 @@ class MLPAgeClock:
         logging.basicConfig(filename=self.log_file, level=logging.INFO)
 
         ## loading the data
-        self.MLP_dataloader = BasicDataLoader(anndata_dir_root=self.anndata_dir_root,
-                                              var_file_name=self.var_file_name,
-                                              var_colname=self.var_colname,
-                                              batch_size_val=self.batch_size_val,
-                                              batch_size_train=self.batch_size_train,
-                                              batch_size_test=self.batch_size_test,
-                                              shuffle=self.shuffle,
-                                              num_workers=self.num_workers,
-                                              age_column=self.age_column,
-                                              cell_id=self.cell_id,
-                                              loader_method=self.loader_method,
-                                              dataset_folder_dict=self.dataset_folder_dict,
-                                              K_fold_mode=K_fold_mode,
-                                              K_fold_train=K_fold_train,
-                                              K_fold_val=K_fold_val
-                                              )
+        self.dataloader = BasicDataLoader(anndata_dir_root=self.anndata_dir_root,
+                                          var_file_name=self.var_file_name,
+                                          var_colname=self.var_colname,
+                                          batch_size_val=self.batch_size_val,
+                                          batch_size_train=self.batch_size_train,
+                                          batch_size_test=self.batch_size_test,
+                                          shuffle=self.shuffle,
+                                          num_workers=self.num_workers,
+                                          age_column=self.age_column,
+                                          cell_id=self.cell_id,
+                                          loader_method=self.loader_method,
+                                          dataset_folder_dict=self.dataset_folder_dict,
+                                          K_fold_mode=K_fold_mode,
+                                          K_fold_train=K_fold_train,
+                                          K_fold_val=K_fold_val
+                                          )
 
         ## checking for validation
         if self.validation_during_training:
@@ -168,7 +168,7 @@ class MLPAgeClock:
 
     def get_val_sample_batch(self):
         # notice: dataloader should be shuffled
-        data_iter_val = iter(self.MLP_dataloader.dataloader_val)
+        data_iter_val = iter(self.dataloader.dataloader_val)
         X_val, y_and_soma = next(data_iter_val)
         y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
         inputs = X_val
@@ -198,7 +198,7 @@ class MLPAgeClock:
             iter_num = 0
             train_samples_num = 0
             total_val_loss = 0
-            for inputs, labels_soma in self.MLP_dataloader.dataloader_train:
+            for inputs, labels_soma in self.dataloader.dataloader_train:
                 if iter_num == 0:
                     print("Inside the Training Iteration loop")
                     logging.info("Inside the Training Iteration loop")
@@ -278,20 +278,20 @@ class MLPAgeClock:
     ## making prediction based on the trained MLP model
     def _predict_basic(self, ):
         if self.predict_dataset == "testing":
-            if "testing" not in self.dataset_folder_dict:
+            if self.dataloader.dataloader_test is None:
                 raise ValueError("testing datasets is not provided!")
             else:
-                predict_dataloader = self.MLP_dataloader.dataloader_test
+                predict_dataloader = self.dataloader.dataloader_test
         elif self.predict_dataset == "validation":
-            if "validation" not in self.dataset_folder_dict:
+            if self.dataloader.dataloader_val is None:
                 raise ValueError("validation datasets is not provided!")
             else:
-                predict_dataloader = self.MLP_dataloader.dataloader_val
+                predict_dataloader = self.dataloader.dataloader_val
         elif self.predict_dataset == "training":
-            if "training" not in self.dataset_folder_dict:
+            if self.dataloader.dataloader_train is None:
                 raise ValueError("training datasets is not provided!")
             else:
-                predict_dataloader = self.MLP_dataloader.dataloader_train
+                predict_dataloader = self.dataloader.dataloader_train
         else:
             raise ValueError("supported datasets for prediction: training, testing, and validation")
         self.model.eval()
