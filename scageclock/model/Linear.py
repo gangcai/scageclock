@@ -277,20 +277,20 @@ class TorchElasticNetAgeClock:
     ## making prediction based on the trained MLP model
     def _predict_basic(self, ):
         if self.predict_dataset == "testing":
-            if "testing" not in self.dataset_folder_dict:
+            if self.dataloader.dataloader_test is None:
                 raise ValueError("testing datasets is not provided!")
             else:
-                predict_dataloader = self.TorchElasticNet_dataloader.dataloader_test
+                predict_dataloader = self.dataloader.dataloader_test
         elif self.predict_dataset == "validation":
-            if "validation" not in self.dataset_folder_dict:
+            if self.dataloader.dataloader_val is None:
                 raise ValueError("validation datasets is not provided!")
             else:
-                predict_dataloader = self.TorchElasticNet_dataloader.dataloader_val
+                predict_dataloader = self.dataloader.dataloader_val
         elif self.predict_dataset == "training":
-            if "training" not in self.dataset_folder_dict:
+            if self.dataloader.dataloader_train is None:
                 raise ValueError("training datasets is not provided!")
             else:
-                predict_dataloader = self.TorchElasticNet_dataloader.dataloader_train
+                predict_dataloader = self.dataloader.dataloader_train
         else:
             raise ValueError("supported datasets for prediction: training, testing, and validation")
         self.model.eval()
