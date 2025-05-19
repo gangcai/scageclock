@@ -13,7 +13,7 @@ class MLPAgeClock:
     def __init__(self,
                  anndata_dir_root: str,
                  dataset_folder_dict: dict | None = None,
-                 feature_size: int = 19031,
+                 feature_size: int = 19183,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
                  cat_card_list: list | None = None,
@@ -40,13 +40,14 @@ class MLPAgeClock:
                  predict_batch_iter_max: int | None = 20,
                  K_fold_mode: bool = False,
                  K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
-                 K_fold_val: tuple[str] = ("Fold5"),
+                 K_fold_val: str = "Fold5",
                  device: str = "cpu",
                  log_file: str = "MLPAgeClock_log.txt"):
         if cat_card_list is None:
             # ['assay', 'cell_type', 'tissue_general', 'sex'],
             # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
-            cat_card_list = [14, 219, 39, 3]
+            # cat_card_list = [14, 219, 39, 3]
+            cat_card_list = [21, 664, 52, 3]
         if hidden_sizes is None:
             hidden_sizes = [512, 256, 128]  # setting default values for hidden sizes
 
@@ -116,7 +117,7 @@ class MLPAgeClock:
         ## checking for validation
         if self.validation_during_training:
             # sampling one batch from validation datasets for validation checking
-            if "validation" in self.dataset_folder_dict:
+            if not self.dataloader.dataloader_val is None:
                 self.val_X_batch, self.val_y_batch = self.get_val_sample_batch()
             else:
                 raise ValueError("validation datasets is not provided!")

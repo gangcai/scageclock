@@ -18,8 +18,8 @@ class BasicDataLoader:
                  dataset_folder_dict=None,
                  balanced_dataloader_parameters: dict | None = None,
                  K_fold_mode: bool = False,
-                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
-                 K_fold_val: tuple[str] = ("Fold5"),
+                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"), # notice: if only one should be like ("Fold1",)
+                 K_fold_val: str = "Fold5",
                  **kwargs
                  ):
         """
@@ -110,7 +110,7 @@ class BasicDataLoader:
                                                         age_column=self.age_column,
                                                         loader_method=self.loader_method,
                                                         balanced_dataloader_parameters=self.balanced_dataloader_parameters,
-                                                        sub_folders=self.K_fold_val,
+                                                        sub_folders=(self.K_fold_val,),
                                                         )
             else:
                 self.dataloader_train = get_data_loader(ad_files_path=ad_files_path,
@@ -123,6 +123,8 @@ class BasicDataLoader:
                                                         balanced_dataloader_parameters=self.balanced_dataloader_parameters,
                                                         sub_folders= self.K_fold_train,
                                                         )
+            print(f"training/validation datasets are loaded from {self.dataset_folder_dict["training_validation"]}")
+            check_tag = True
         if "training" in self.dataset_folder_dict:
 
             self.dataloader_train = get_data_loader(ad_files_path=os.path.join(self.anndata_dir_root, self.dataset_folder_dict["training"]),
@@ -208,6 +210,7 @@ def get_data_loader(ad_files_path: str,
     else:
         ad_files = []
         for sub_folder in sub_folders:
+            print(os.path.join(ad_files_path, sub_folder))
             sub_folder_ad_files = get_h5ad_files(os.path.join(ad_files_path, sub_folder))
             ad_files += sub_folder_ad_files
 

@@ -16,7 +16,7 @@ class GatedMultiheadAttentionAgeClock:
                  dataset_folder_dict: dict | None = None,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
-                 feature_size: int = 19031,
+                 feature_size: int = 19183, # 19031,
                  cat_card_list: list[int] | None = None,
                  n_embed: int = 4,
                  var_file_name: str = "h5ad_var.tsv",
@@ -47,7 +47,7 @@ class GatedMultiheadAttentionAgeClock:
                  balanced_dataloader_parameters: dict | None = None,
                  K_fold_mode: bool = False,
                  K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
-                 K_fold_val: tuple[str] = ("Fold5"),
+                 K_fold_val: str = "Fold5",
                  save_checkpoint: bool = False,
                  checkpoint_outdir: str = "./checkpoints_saved", # only used when save_checkpoint is true
                  checkpoint_file_prefix: str = "GMA",
@@ -102,7 +102,8 @@ class GatedMultiheadAttentionAgeClock:
         if cat_card_list is None:
             # default order of categorical columns: ['assay', 'cell_type', 'tissue_general', 'sex'],
             # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
-            cat_card_list = [14, 219, 39, 3]
+            # cat_card_list = [14, 219, 39, 3] # old version
+            cat_card_list = [21, 664, 52, 3]
 
         # default value for dataset_folder_dict if it is None
         if K_fold_mode and (dataset_folder_dict is None):
@@ -192,7 +193,7 @@ class GatedMultiheadAttentionAgeClock:
         ## checking for validation
         if self.validation_during_training:
             # sampling one batch from validation datasets for validation checking
-            if "validation" in self.dataset_folder_dict:
+            if not self.dataloader.dataloader_val is None:
                 self.val_X_batch, self.val_y_batch = self.get_val_sample_batch()
             else:
                 raise ValueError("validation datasets is not provided!")

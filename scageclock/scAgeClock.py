@@ -28,7 +28,7 @@ from .model.XGBoost import XGBoostAgeClock
 # /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_valdata.parquet
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
-                      feature_size: int = 19031,
+                      feature_size: int = 19183, # 19031,
                       suffix: str = "pb",
                       run_id: str = "v1",
                       ad_dir_root: str = "./db/",
@@ -73,7 +73,8 @@ def training_pipeline(model_name: str = "GMA",
     ## checking the inputs
     inputs_checker(dataset_folder_dict,
                    ad_dir_root=ad_dir_root,
-                   meta_file_path=meta_file_path,)
+                   meta_file_path=meta_file_path,
+                   K_fold_mode=K_fold_mode)
 
     ## checking the models
     available_models = list_available_models(print_model_name=False)
@@ -426,12 +427,16 @@ def list_available_models(print_model_name=True):
 
 def inputs_checker(dataset_folder_dict,
                    ad_dir_root,
-                   meta_file_path):
+                   meta_file_path,
+                   K_fold_mode: bool = False,):
     # check the existence of the folders and files
     for sub_folder in dataset_folder_dict.values():
         if not os.path.exists(os.path.join(ad_dir_root, sub_folder)):
             raise ValueError(f"sub folder not exist in the inputs root directory: {sub_folder}!")
-        sub_folder_h5ad_files = glob.glob(os.path.join(ad_dir_root, f"{sub_folder}/*.h5ad"))
+        if K_fold_mode:
+            sub_folder_h5ad_files = glob.glob(os.path.join(ad_dir_root, f"{sub_folder}/*/*.h5ad"))
+        else:
+            sub_folder_h5ad_files = glob.glob(os.path.join(ad_dir_root, f"{sub_folder}/*.h5ad"))
         if len(sub_folder_h5ad_files) < 1:
             raise ValueError(f"NO h5ad file under the  {sub_folder}/ in the root directory")
 
