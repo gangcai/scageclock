@@ -625,6 +625,28 @@ def fully_loaded(h5ad_file_path: str,
         age_soma = np.array(age_soma, dtype=np.int32)
         return X, age_soma
 
+def fully_loaded_KFolds(h5ad_file_path: str,
+                       age_column: str = "age",
+                       cell_id: str = "soma_joinid",
+                       return_anndata: bool = False,
+                       K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
+                       ):
+    ad_files = []
+    for fold in K_fold_train:
+        ad_files += glob.glob(os.path.join(h5ad_file_path, fold, "*.h5ad"))
+
+    ad_list = [sc.read_h5ad(f) for f in ad_files]
+
+    ad_concat = anndata.concat(ad_list, label="chunk", keys=[os.path.basename(f) for f in ad_files])
+
+    if return_anndata:
+        return ad_concat
+    else:
+        X = ad_concat.X.toarray()
+        age_soma = ad_concat.obs[[age_column, cell_id]].values
+        age_soma = np.array(age_soma, dtype=np.int32)
+        return X, age_soma
+
 
 def get_cell_ids(h5ad_file_path: str,
                  cell_id: str = "soma_joinid",
