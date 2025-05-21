@@ -5,7 +5,7 @@ import time
 from ..utility import get_validation_metrics
 import torch
 from ..dataloader import BasicDataLoader
-from ..h5ad_dataloader import fully_loaded
+from ..h5ad_dataloader import fully_loaded, fully_loaded_KFolds
 import logging
 import os
 
@@ -24,7 +24,11 @@ class CatBoostDataLoader(BasicDataLoader):
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
                  loader_method: str = "scageclock",
-                 dataset_folder_dict: dict | None = None,):
+                 dataset_folder_dict: dict | None = None,
+                 K_fold_mode: bool = False,
+                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
+                 K_fold_val: str = "Fold5",
+                 ):
         if dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
         # Call the parent class's __init__ method using super()
@@ -39,7 +43,10 @@ class CatBoostDataLoader(BasicDataLoader):
                          age_column=age_column,
                          cell_id=cell_id,
                          loader_method=loader_method,
-                         dataset_folder_dict=dataset_folder_dict
+                         dataset_folder_dict=dataset_folder_dict,
+                         K_fold_mode=K_fold_mode,
+                         K_fold_train=K_fold_train,
+                         K_fold_val=K_fold_val
                          )
         self.cat_idx_start = cat_idx_start
         self.cat_idx_end = cat_idx_end
@@ -95,12 +102,17 @@ class CatBoostAgeClock:
                  validation_dataset_fully_loaded: bool = False,
                  train_batch_iter_max: int = 1,  ## maximal number of batch iteration for model training
                  predict_batch_iter_max: int = 20,
+                 K_fold_mode: bool = False,
+                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
+                 K_fold_val: str = "Fold5",
                  log_file: str = "log.txt",
                  **kwargs
                  ):
 
         # default value for dataset_folder_dict if it is None
-        if dataset_folder_dict is None:
+        if K_fold_mode and (dataset_folder_dict is None):
+            dataset_folder_dict = {"training_validation": "train_val"}
+        elif dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
 
         self.anndata_dir_root = anndata_dir_root
@@ -137,6 +149,10 @@ class CatBoostAgeClock:
         self.validation_dataset_fully_loaded = validation_dataset_fully_loaded
         self.train_batch_iter_max = train_batch_iter_max
 
+        self.K_fold_mode = K_fold_mode
+        self.K_fold_train = K_fold_train
+        self.K_fold_val = K_fold_val
+
 
         # Configure logging
         self.log_file = log_file
@@ -156,14 +172,27 @@ class CatBoostAgeClock:
                                              age_column=self.age_column,
                                              cell_id=self.cell_id,
                                              loader_method=self.loader_method,
-                                             dataset_folder_dict=self.dataset_folder_dict
+                                             dataset_folder_dict=self.dataset_folder_dict,
+                                             K_fold_mode=self.K_fold_mode,
+                                             K_fold_train=self.K_fold_train,
+                                             K_fold_val=self.K_fold_val
                                              )
 
         ## loading all training data to the memory
         if self.train_dataset_fully_loaded:
-            print("All training .h5ad files are loaded into memory!")
-            train_h5ad_dir = os.path.join(anndata_dir_root, self.dataset_folder_dict["training"])
-            self.train_all_data = fully_loaded(train_h5ad_dir)
+            if not self.K_fold_mode:
+                print("All training .h5ad files are loaded into memory!")
+                train_h5ad_dir = os.path.join(anndata_dir_root, self.dataset_folder_dict["training"])
+                self.train_all_data = fully_loaded(train_h5ad_dir,
+                                                   age_column=self.age_column,
+                                                   cell_id=self.cell_id)
+            else:
+                train_h5ad_dir = os.path.join(anndata_dir_root, self.dataset_folder_dict["training_validation"])
+                self.train_all_data = fully_loaded_KFolds(train_h5ad_dir,
+                                                          K_fold_train=self.K_fold_train,
+                                                          age_column=self.age_column,
+                                                          cell_id=self.cell_id)
+
 
         ## create CatBoostRegressor model
         self.model = CatBoostRegressor(iterations=self.iterations,
@@ -277,17 +306,17 @@ class CatBoostAgeClock:
         if not self.predict_dataset_fully_loaded:
             print("prediction based on multiple batches")
             if self.predict_dataset == "testing":
-                if "testing" not in self.dataset_folder_dict:
+                if self.dataloader.dataloader_test is None:
                     raise ValueError("testing datasets is not provided!")
                 else:
                     predict_dataloader = self.dataloader.dataloader_test
             elif self.predict_dataset == "validation":
-                if "validation" not in self.dataset_folder_dict:
+                if self.dataloader.dataloader_val is None:
                     raise ValueError("validation datasets is not provided!")
                 else:
                     predict_dataloader = self.dataloader.dataloader_val
             elif self.predict_dataset == "training":
-                if "training" not in self.dataset_folder_dict:
+                if self.dataloader.dataloader_train is None:
                     raise ValueError("training datasets is not provided!")
                 else:
                     predict_dataloader = self.dataloader.dataloader_train
@@ -314,14 +343,31 @@ class CatBoostAgeClock:
                 if iter_num >= self.predict_batch_iter_max:
                     break
         else:
-            print("prediction based on all prediction datasets, all of which is loaded into memory")
-            X, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict[self.predict_dataset]))
-            targets_all = y_and_soma[:,0]
-            soma_ids_all = y_and_soma[:,1]
-            predict_pool = self.dataloader.get_pool_data(X=X,
-                                                     y=targets_all)
-            predictions = self.model.predict(predict_pool)
-            predictions = predictions.squeeze()
+            if not self.K_fold_mode:
+                print("prediction based on all prediction datasets, all of which is loaded into memory")
+                X, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root,
+                                                          self.dataset_folder_dict[self.predict_dataset]),
+                                             age_column=self.age_column,
+                                             cell_id=self.cell_id)
+                targets_all = y_and_soma[:,0]
+                soma_ids_all = y_and_soma[:,1]
+                predict_pool = self.dataloader.get_pool_data(X=X,
+                                                         y=targets_all)
+                predictions = self.model.predict(predict_pool)
+                predictions = predictions.squeeze()
+            else:
+                print("prediction based on all prediction datasets, all of which is loaded into memory")
+                X, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root,
+                                                          self.dataset_folder_dict["training_validation"],
+                                                          self.K_fold_val),
+                                             age_column=self.age_column,
+                                             cell_id=self.cell_id)
+                targets_all = y_and_soma[:,0]
+                soma_ids_all = y_and_soma[:,1]
+                predict_pool = self.dataloader.get_pool_data(X=X,
+                                                         y=targets_all)
+                predictions = self.model.predict(predict_pool)
+                predictions = predictions.squeeze()
 
         return predictions, targets_all, np.array(soma_ids_all).flatten()
 
