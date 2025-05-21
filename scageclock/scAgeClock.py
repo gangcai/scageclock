@@ -145,6 +145,9 @@ def training_pipeline(model_name: str = "GMA",
                                      depth=boost_depth,
                                      used_ram_limit=cat_used_ram_limit,
                                      iterations=boost_iteration,
+                                     K_fold_mode=K_fold_mode,
+                                     K_fold_train=K_fold_train,
+                                     K_fold_val=K_fold_val,
                                      **kwargs
                                      )
     elif model_name == "xgboost":
@@ -163,6 +166,9 @@ def training_pipeline(model_name: str = "GMA",
                                     log_file=log_file,
                                     max_depth=boost_depth,
                                     n_estimators=boost_iteration,
+                                    K_fold_mode=K_fold_mode,
+                                    K_fold_train=K_fold_train,
+                                    K_fold_val=K_fold_val,
                                     **kwargs
                                     )
     elif model_name == "linear":

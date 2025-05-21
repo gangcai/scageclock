@@ -294,12 +294,28 @@ class CatBoostAgeClock:
             val_pool = self.dataloader.get_pool_data(X=X_val,
                                                      y=y_val)
         else:
-            print("All validation data is used and loaded into memory")
-            X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root, self.dataset_folder_dict["validation"]))
-            y_val = y_and_soma[:,0]
-            soma_ids = y_and_soma[:,1]
-            val_pool = self.dataloader.get_pool_data(X=X_val,
-                                                     y=y_val)
+            if not self.K_fold_val:
+                print("All validation data is used and loaded into memory")
+                X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root,
+                                                          self.dataset_folder_dict["validation"]),
+                                             age_column=self.age_column,
+                                             cell_id=self.cell_id)
+                y_val = y_and_soma[:,0]
+                soma_ids = y_and_soma[:,1]
+                val_pool = self.dataloader.get_pool_data(X=X_val,
+                                                         y=y_val)
+            else:
+                print("All validation data is used and loaded into memory")
+                X_val, y_and_soma = fully_loaded(os.path.join(self.anndata_dir_root,
+                                                          self.dataset_folder_dict["training_validation"],
+                                                          self.K_fold_val),
+                                             age_column=self.age_column,
+                                             cell_id=self.cell_id)
+                y_val = y_and_soma[:,0]
+                soma_ids = y_and_soma[:,1]
+                val_pool = self.dataloader.get_pool_data(X=X_val,
+                                                         y=y_val)
+
         return val_pool, soma_ids
 
     def _predict_basic(self, ):
