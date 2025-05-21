@@ -94,20 +94,20 @@ class TorchElasticNetAgeClock:
         logging.basicConfig(filename=self.log_file, level=logging.INFO)
 
         ## loading the data
-        self.TorchElasticNet_dataloader = BasicDataLoader(anndata_dir_root=self.anndata_dir_root,
-                                                          var_file_name=self.var_file_name,
-                                                          var_colname=self.var_colname,
-                                                          batch_size_val=self.batch_size_val,
-                                                          batch_size_train=self.batch_size_train,
-                                                          batch_size_test=self.batch_size_test,
-                                                          shuffle=self.shuffle,
-                                                          num_workers=self.num_workers,
-                                                          loader_method=self.loader_method,
-                                                          dataset_folder_dict=self.dataset_folder_dict,
-                                                          K_fold_mode=K_fold_mode,
-                                                          K_fold_train=K_fold_train,
-                                                          K_fold_val=K_fold_val
-                                                          )
+        self.dataloader = BasicDataLoader(anndata_dir_root=self.anndata_dir_root,
+                                          var_file_name=self.var_file_name,
+                                          var_colname=self.var_colname,
+                                          batch_size_val=self.batch_size_val,
+                                          batch_size_train=self.batch_size_train,
+                                          batch_size_test=self.batch_size_test,
+                                          shuffle=self.shuffle,
+                                          num_workers=self.num_workers,
+                                          loader_method=self.loader_method,
+                                          dataset_folder_dict=self.dataset_folder_dict,
+                                          K_fold_mode=K_fold_mode,
+                                          K_fold_train=K_fold_train,
+                                          K_fold_val=K_fold_val
+                                          )
 
         ## checking for validation
         if self.validation_during_training:
@@ -165,7 +165,7 @@ class TorchElasticNetAgeClock:
 
     def get_val_sample_batch(self):
         # notice: dataloader should be shuffled
-        data_iter_val = iter(self.TorchElasticNet_dataloader.dataloader_val)
+        data_iter_val = iter(self.dataloader.dataloader_val)
         X_val, y_and_soma = next(data_iter_val)
         y_val, soma_ids = torch.split(y_and_soma, split_size_or_sections=1, dim=1)
         inputs = X_val
@@ -195,7 +195,7 @@ class TorchElasticNetAgeClock:
             iter_num = 0
             train_samples_num = 0
             total_val_loss = 0
-            for inputs, labels_soma in self.TorchElasticNet_dataloader.dataloader_train:
+            for inputs, labels_soma in self.dataloader.dataloader_train:
                 if iter_num == 0:
                     print("Inside the Training Iteration loop")
                     logging.info("Inside the Training Iteration loop")
