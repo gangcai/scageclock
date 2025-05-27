@@ -224,7 +224,8 @@ class XGBoostAgeClock:
             reg_lambda=self.reg_lambda,
             **kwargs)
 
-        self.X_val, self.y_val, self.val_soma_ids = self._get_val_data()
+        if self.validation_during_training:
+            self.X_val, self.y_val, self.val_soma_ids = self._get_val_data()
         self.eval_metrics = None
 
     def train(self,):
