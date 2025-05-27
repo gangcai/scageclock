@@ -212,7 +212,8 @@ class CatBoostAgeClock:
         self.train_batch_iter_max = train_batch_iter_max
         self.predict_batch_iter_max = predict_batch_iter_max
 
-        self.val_pool, self.val_soma_ids = self._get_val_pool()
+        if self.validation_during_training:
+            self.val_pool, self.val_soma_ids = self._get_val_pool()
         self.eval_metrics = None
 
     def train(self,):
