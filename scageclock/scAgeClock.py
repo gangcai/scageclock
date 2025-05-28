@@ -26,6 +26,7 @@ from .model.XGBoost import XGBoostAgeClock
 # /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/
 # /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet
 # /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_valdata.parquet
+# TODO: change the saving method for xgboost
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
                       feature_size: int = 19183, # 19031,
@@ -275,13 +276,13 @@ def training_pipeline(model_name: str = "GMA",
     ### saving the model #####
     print("start saving the model")
     if model_name == "xgboost":
-        model_save_method = "joblib"
-        print(f"{model_name} only support joblib model saving")
+        model_save_method = "bin"
+        print(f"{model_name} only support bin model saving")
     elif model_name == "catboost":
         model_save_method = "cbm"
         print(f"{model_name} only support cbm model saving")
     else:
-        if model_name not in ["stat_dict","pkl","joblib"]:
+        if model_save_method not in ["stat_dict","pkl","joblib"]:
             model_save_method = "stat_dict"
             print(f"neural network model supports one of stat_dict, pkl or joblib format model saving")
 
@@ -293,8 +294,11 @@ def training_pipeline(model_name: str = "GMA",
             pickle.dump(age_clock, file)
     elif model_save_method == "cbm": # For Catboost
         age_clock.model.save_model(os.path.join(outdir, f"{prefix}.cbm"))
+    elif model_save_method == "bin":
+        age_clock.model.save_model(os.path.join(outdir, f"{prefix}.bin"))
     elif model_save_method == "joblib":
-        joblib.dump(age_clock, os.path.join(outdir,f"{prefix}.joblib"))
+        # joblib.dump(age_clock, os.path.join(outdir,f"{prefix}.joblib")) # don't save the whole age_clock, which can be huge
+        joblib.dump(age_clock.model, os.path.join(outdir,f"{prefix}.joblib"))
     else:
         print(f"Warning: only [stat_dict, pkl, joblib, cbm] are supported for model_save_method parameter settings")
 
