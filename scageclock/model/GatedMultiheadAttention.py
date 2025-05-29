@@ -325,17 +325,23 @@ class GatedMultiheadAttentionAgeClock:
                             logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
                             logging.info(f"validation loss: {loss.item()}")
 
-                    ############### end of the loop when reaching train_batch_iter_max ###############
-                    ## it will take too long to fully iterate the whole batches
-                    ## only sampling maximal train_batch_iter_max batches for the training process
-                    if not self.train_batch_iter_max is None:
-                        if iter_num >= self.train_batch_iter_max:
-                            break
+                ############### end of the loop when reaching train_batch_iter_max ###############
+                ## it will take too long to fully iterate the whole batches
+                ## only sampling maximal train_batch_iter_max batches for the training process
+                if not self.train_batch_iter_max is None:
+                    if iter_num >= self.train_batch_iter_max:
+                        break
             ## end of batch loop
             print(f"training for epoch {epoch} completed")
-            print(f"iter_num: {iter_num}")
+            print(f"number of batches iterated: {iter_num}")
+
+
             logging.info(f"training for epoch {epoch} completed")
-            logging.info(f"iter_num: {iter_num}")
+            logging.info(f"number of batches iterated: {iter_num}")
+            end_time = time.perf_counter()
+            print(f"accumulated time relapsed for epoch {epoch} : {end_time - start_time} seconds (training stage)")
+            logging.info(
+                f"accumulated time relapsed for epoch {epoch} : {end_time - start_time} seconds (training stage)")
             # Calculate average training loss (use total number of samples)
             avg_train_loss = total_train_loss / train_samples_num
             print(f"Epoch {epoch + 1}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
@@ -343,6 +349,7 @@ class GatedMultiheadAttentionAgeClock:
             epoch_train_loss_list.append(avg_train_loss)
 
             if self.validation_during_training:
+                logging.info(f"training for epoch {epoch} completed, starting model validation")
                 # Calculate average validation loss (use total number of samples)
                 avg_val_loss = total_val_loss / train_samples_num
                 epoch_val_loss_list.append(avg_val_loss)
@@ -363,6 +370,9 @@ class GatedMultiheadAttentionAgeClock:
                             'train_avg_loss': avg_train_loss},
                            cp_file)
         ## end of epoch loop
+        end_time = time.perf_counter()
+        print(f"accumulated time relapsed for the model training: {end_time - start_time} seconds (training stage)")
+        logging.info(f"accumulated time relapsed for the model training: {end_time - start_time} seconds (training stage)")
 
         return epoch_train_loss_list, epoch_val_loss_list, all_batch_train_loss_list, all_batch_val_loss_list
 
