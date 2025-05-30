@@ -127,6 +127,7 @@ class H5ADSampler:
                     ad_list.append(adata_s)
             ad_join = anndata.concat(ad_list)
             ad_join.var_names_make_unique()
+            ad_join.write_h5ad(os.path.join(self.outdir, f"{self.prefix}.h5ad"))
             return ad_join
         else:
             chunk_id = 0
