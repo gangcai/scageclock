@@ -402,15 +402,15 @@ def get_feature_importance(model):
 def load_GMA_model(model_file,
                    model_file_type: str = "pth",
                    cat_cardinalities: list[int] | None = None,
-                   num_numeric_features: int = 19027,
+                   num_numeric_features: int = 19179, # 19183-4,
                    hidden_dim: int = 128,
-                   l1_lambda: float = 0.01,
+                   l1_lambda: float = 0.001,
                    l2_lambda: float = 0,
                    num_heads: int = 8,):
     if cat_cardinalities is None:
         # ['assay', 'cell_type', 'tissue_general', 'sex'],
         # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
-        cat_cardinalities = [14, 219, 39, 3]
+        cat_cardinalities = [21, 664, 52, 3]
 
     if model_file_type == "pth":
         GMA_model = GMANet(cat_cardinalities=cat_cardinalities,
