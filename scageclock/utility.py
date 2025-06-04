@@ -8,7 +8,7 @@ from typing import List, Literal
 import glob
 import anndata
 
-from .formatting import format_anndata
+from .formatting import format_anndata_single_category as format_anndata
 
 from scipy.stats import pearsonr
 from scipy.sparse import issparse
