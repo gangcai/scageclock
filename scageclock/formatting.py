@@ -55,15 +55,16 @@ def update_anndata_with_missing_genes(adata, gene_list):
 
 # cat_folder:
 # /home/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/categorical_numeric_index
-def format_anndata(adata_raw,
-                   model_genes,  ## genes used in the scageclock Model
-                   cat_folder,
-                   gene_column="feature_name",
-                   normalize: bool = True,
-                   assay: str = "10x 3' v3",
-                   sex: str="male",
-                   tissue_general: str = "brain",
-                   cell_type = "neuron"):
+## TODO: need further checking
+def format_anndata_single_category(adata_raw,
+                                   model_genes,  ## genes used in the scageclock Model
+                                   cat_folder,
+                                   gene_column="feature_name",
+                                   normalize: bool = True,
+                                   assay: str = "10x 3' v3",
+                                   sex: str = "male",
+                                   tissue_general: str = "brain",
+                                   cell_type="neuron"):
     cat_cols = ["assay", "cell_type", "tissue_general", "sex"]
     cat_dict = {}
     for cat in cat_cols:
@@ -90,11 +91,55 @@ def format_anndata(adata_raw,
                            "sex": [sex_idx] * n_cell})
 
     # make adata_raw contain all model genes
-    adata_raw = update_anndata_with_missing_genes(adata_raw, model_genes)
+    adata = update_anndata_with_missing_genes(adata_raw, model_genes)
 
-    adata_raw.var_names = adata_raw.var[gene_column]
+    #adata_raw.var_names = adata_raw.var[gene_column]
 
-    adata = adata_raw
+    #adata = adata_raw
+
+    obs_df = adata.obs
+
+    if normalize:
+        ## normalize the gene expression data based on all filtered genes
+        # Normalizing to median total counts
+        sc.pp.normalize_total(adata)
+        # Logarithmize the data
+        sc.pp.log1p(adata)
+        print(f"shape during normalization: {adata.shape}")
+
+    ## filter by protein coding genes
+    adata = adata[:, model_genes]
+
+    print(f"shape after protein coding selection: {adata.shape}")
+
+    # merge categorical features and gene expression features
+    X_merged = hstack([csr_matrix(cat_df), adata.X])
+
+    del adata  # free the memory
+    adata_m = ad.AnnData(csr_matrix(X_merged))
+    adata_m.obs = obs_df
+    adata_m.obs.index = adata_m.obs.index.astype(str)  ## convert .obs.index to str type
+    del X_merged
+    gc.collect()
+    print(f"shape after adding categorical data: {adata_m.shape}")
+    return adata_m
+
+def format_anndata_multiple(adata_raw,
+                            model_genes,  ## genes used in the scageclock Model
+                            gene_column="feature_name",
+                            normalize: bool = True,
+                            cat_cols: None | list[str] = None):
+
+    if cat_cols is None:
+        cat_cols = ["assay_index", "cell_type_index", "tissue_index", "sex_index"]
+
+    cat_df = adata_raw.obs[cat_cols]
+    # make adata_raw contain all model genes
+    adata = update_anndata_with_missing_genes(adata_raw, model_genes)
+
+    #adata_raw.var_names = adata_raw.var[gene_column]
+
+    #adata = adata_raw
 
     obs_df = adata.obs
 
