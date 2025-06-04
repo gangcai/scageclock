@@ -124,9 +124,8 @@ def format_anndata_single_category(adata_raw,
     print(f"shape after adding categorical data: {adata_m.shape}")
     return adata_m
 
-def format_anndata_multiple(adata_raw,
+def format_anndata_multiple(adata_raw, # gene_name should be in adata_raw.var_names
                             model_genes,  ## genes used in the scageclock Model
-                            gene_column="feature_name",
                             normalize: bool = True,
                             cat_cols: None | list[str] = None):
 
