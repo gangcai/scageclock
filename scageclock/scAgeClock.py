@@ -364,7 +364,7 @@ def training_pipeline(model_name: str = "GMA",
     return True
 
 ## given a single cell matrix inputs (numpy array or tensor), predict the donor/individual age of the cells
-# TODO: optimize
+## TODO: merge with the prediction function in evaluation
 def predict(model,
             inputs,
             device='cpu'):
@@ -374,6 +374,11 @@ def predict(model,
 
     if not (isinstance(inputs, np.ndarray) or isinstance(inputs, torch.Tensor)):
         raise  ValueError("inputs type should be either of numpy.ndarray or torch.Tensor")
+
+    # format the dtype of the inputs
+    if isinstance(inputs, np.ndarray):
+        inputs = torch.from_numpy(inputs)
+    inputs = inputs.to(torch.float32)
 
     model_device_name = check_model_device(model)
     if isinstance(inputs,np.ndarray):
