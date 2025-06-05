@@ -166,3 +166,21 @@ def format_anndata_multiple(adata_raw, # gene_name should be in adata_raw.var_na
     gc.collect()
     print(f"shape after adding categorical data: {adata_m.shape}")
     return adata_m
+
+## match name with the model categorical index
+def match_categorical_features(name_match_dict, model_cat_dict, cat="assay"):
+    original_name_lst = []
+    model_name_lst = []
+    model_index_lst = []
+    for original_name in name_match_dict.keys():
+        matched_name = name_match_dict[original_name]
+        #print([original_name,matched_name]) # for debug
+        df = model_cat_dict[cat]
+        matched_index = list(df[df["categorical_value"]==matched_name]['numeric_index'])[0]
+        original_name_lst.append(original_name)
+        model_name_lst.append(matched_name)
+        model_index_lst.append(matched_index)
+    match_df = pd.DataFrame({"original_cat_name":original_name_lst,
+                              "model_cat_name":model_name_lst,
+                              "model_cat_index":model_index_lst})
+    return match_df
