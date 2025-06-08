@@ -1,0 +1,22 @@
+numeric_index	categorical_value
+0	10x 3' transcription profiling
+1	10x 3' v1
+2	10x 3' v2
+3	10x 3' v3
+4	10x 5' transcription profiling
+5	10x 5' v1
+6	10x 5' v2
+7	BD Rhapsody Targeted mRNA
+8	BD Rhapsody Whole Transcriptome Analysis
+9	CEL-seq2
+10	Drop-seq
+11	MARS-seq
+12	SPLiT-seq
+13	ScaleBio single cell RNA sequencing
+14	Seq-Well
+15	Seq-Well S3
+16	Smart-seq v4
+17	Smart-seq2
+18	TruDrop
+19	microwell-seq
+20	sci-RNA-seq

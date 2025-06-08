@@ -1,0 +1,53 @@
+numeric_index	categorical_value
+0	adipose tissue
+1	adrenal gland
+2	bladder organ
+3	blood
+4	bone marrow
+5	brain
+6	breast
+7	central nervous system
+8	colon
+9	digestive system
+10	embryo
+11	endocrine gland
+12	esophagogastric junction
+13	esophagus
+14	exocrine gland
+15	eye
+16	fallopian tube
+17	gallbladder
+18	heart
+19	immune system
+20	intestine
+21	kidney
+22	lamina propria
+23	large intestine
+24	liver
+25	lung
+26	lymph node
+27	mucosa
+28	musculature
+29	nose
+30	omentum
+31	ovary
+32	pancreas
+33	placenta
+34	pleura
+35	prostate gland
+36	reproductive system
+37	respiratory system
+38	scalp
+39	skeletal system
+40	skin of body
+41	small intestine
+42	spinal cord
+43	spleen
+44	stomach
+45	tendon of semitendinosus
+46	testis
+47	tongue
+48	ureter
+49	uterus
+50	vasculature
+51	yolk sac

@@ -1,0 +1,665 @@
+numeric_index	categorical_value
+0	B cell
+1	B-1 B cell
+2	B-1a B cell
+3	B-1b B cell
+4	B-2 B cell
+5	BEST4+ intestinal epithelial cell, human
+6	Bergmann glial cell
+7	CD14-low, CD16-positive monocyte
+8	CD14-positive monocyte
+9	CD14-positive, CD16-negative classical monocyte
+10	CD14-positive, CD16-positive monocyte
+11	CD141-positive myeloid dendritic cell
+12	CD16-negative, CD56-bright natural killer cell, human
+13	CD16-positive, CD56-dim natural killer cell, human
+14	CD1c-positive myeloid dendritic cell
+15	CD34-positive, CD38-negative hematopoietic stem cell
+16	CD34-positive, CD56-positive, CD117-positive common innate lymphoid precursor, human
+17	CD4-positive helper T cell
+18	CD4-positive, CD25-positive, alpha-beta regulatory T cell
+19	CD4-positive, alpha-beta T cell
+20	CD4-positive, alpha-beta cytotoxic T cell
+21	CD4-positive, alpha-beta memory T cell
+22	CD4-positive, alpha-beta thymocyte
+23	CD8-alpha alpha positive, gamma-delta intraepithelial T cell
+24	CD8-alpha-alpha-positive, alpha-beta intraepithelial T cell
+25	CD8-alpha-beta-positive, alpha-beta intraepithelial T cell
+26	CD8-positive, alpha-beta T cell
+27	CD8-positive, alpha-beta cytokine secreting effector T cell
+28	CD8-positive, alpha-beta cytotoxic T cell
+29	CD8-positive, alpha-beta memory T cell
+30	CD8-positive, alpha-beta memory T cell, CD45RO-positive
+31	CD8-positive, alpha-beta thymocyte
+32	CNS interneuron
+33	Cajal-Retzius cell
+34	DN1 thymic pro-T cell
+35	DN3 thymocyte
+36	DN4 thymocyte
+37	GABAergic amacrine cell
+38	GABAergic interneuron
+39	GABAergic neuron
+40	GIP cell
+41	H1 horizontal cell
+42	H2 horizontal cell
+43	Hofbauer cell
+44	ILC1, human
+45	IgA plasma cell
+46	IgA plasmablast
+47	IgG memory B cell
+48	IgG plasma cell
+49	IgG plasmablast
+50	IgG-negative class switched memory B cell
+51	IgM plasma cell
+52	Kupffer cell
+53	L2/3 intratelencephalic projecting glutamatergic neuron
+54	L2/3-6 intratelencephalic projecting glutamatergic neuron
+55	L5 extratelencephalic projecting glutamatergic cortical neuron
+56	L5/6 near-projecting glutamatergic neuron of the primary motor cortex
+57	L6 corticothalamic-projecting glutamatergic cortical neuron
+58	L6 intratelencephalic projecting glutamatergic neuron of the primary motor cortex
+59	L6b glutamatergic cortical neuron
+60	Langerhans cell
+61	Leydig cell
+62	M cell of gut
+63	MHC-II-positive classical monocyte
+64	Merkel cell
+65	Mueller cell
+66	NKp44-negative group 3 innate lymphoid cell, human
+67	NKp44-positive group 3 innate lymphoid cell, human
+68	OFF-bipolar cell
+69	OFFx cell
+70	ON-bipolar cell
+71	ON-blue cone bipolar cell
+72	P/D1 enteroendocrine cell
+73	PP cell
+74	Purkinje cell
+75	S cone cell
+76	Schwann cell
+77	Schwann cell precursor
+78	Sertoli cell
+79	T cell
+80	T follicular helper cell
+81	T follicular regulatory cell
+82	T-helper 1 cell
+83	T-helper 17 cell
+84	T-helper 2 cell
+85	T-helper 22 cell
+86	Tc1 cell
+87	abnormal cell
+88	absorptive cell
+89	acinar cell
+90	acinar cell of salivary gland
+91	activated CD4-positive, alpha-beta T cell
+92	activated CD4-positive, alpha-beta T cell, human
+93	activated CD8-positive, alpha-beta T cell
+94	activated CD8-positive, alpha-beta T cell, human
+95	activated type II NK T cell
+96	adipocyte
+97	adipocyte of breast
+98	adipocyte of epicardial fat of left ventricle
+99	adventitial cell
+100	airway submucosal gland duct basal cell
+101	alpha-beta T cell
+102	alternatively activated macrophage
+103	alveolar macrophage
+104	alveolar type 1 fibroblast cell
+105	alveolar type 2 fibroblast cell
+106	amacrine cell
+107	anterior lens cell
+108	astrocyte
+109	astrocyte of the cerebral cortex
+110	basal cell
+111	basal cell of epidermis
+112	basal cell of epithelium of trachea
+113	basal cell of prostate epithelium
+114	basal epithelial cell of prostatic duct
+115	basal epithelial cell of tracheobronchial tree
+116	basophil
+117	basophil mast progenitor cell
+118	bipolar neuron
+119	bladder urothelial cell
+120	blood cell
+121	blood vessel endothelial cell
+122	blood vessel smooth muscle cell
+123	bone marrow cell
+124	brain vascular cell
+125	brainstem motor neuron
+126	bronchial epithelial cell
+127	bronchial goblet cell
+128	bronchial smooth muscle cell
+129	bronchus fibroblast of lung
+130	brush cell
+131	brush cell of trachea
+132	brush cell of trachebronchial tree
+133	capillary endothelial cell
+134	cardiac endothelial cell
+135	cardiac mesenchymal cell
+136	cardiac muscle cell
+137	cardiac muscle myoblast
+138	cardiac neuron
+139	caudal ganglionic eminence derived GABAergic cortical interneuron
+140	cell of skeletal muscle
+141	central memory CD4-positive, alpha-beta T cell
+142	central memory CD8-positive, alpha-beta T cell
+143	central nervous system macrophage
+144	centrilobular region hepatocyte
+145	centroblast
+146	centrocyte
+147	cerebellar granule cell
+148	cerebellar granule cell precursor
+149	cerebral cortex GABAergic interneuron
+150	cerebral cortex endothelial cell
+151	chandelier cell
+152	chandelier pvalb GABAergic cortical interneuron
+153	cholangiocyte
+154	chondrocyte
+155	chorionic trophoblast cell
+156	choroid plexus epithelial cell
+157	chromaffin cell
+158	ciliary muscle cell
+159	ciliated cell
+160	ciliated columnar cell of tracheobronchial tree
+161	ciliated epithelial cell
+162	class switched memory B cell
+163	classical monocyte
+164	club cell
+165	collagen secreting cell
+166	colon epithelial cell
+167	colon goblet cell
+168	colon macrophage
+169	columnar/cuboidal epithelial cell
+170	common dendritic progenitor
+171	common lymphoid progenitor
+172	common myeloid progenitor
+173	cone retinal bipolar cell
+174	conjunctival epithelial cell
+175	connective tissue cell
+176	contractile cell
+177	conventional dendritic cell
+178	cord blood hematopoietic stem cell
+179	corneal endothelial cell
+180	corneal epithelial cell
+181	cortical cell of adrenal gland
+182	cortical interneuron
+183	cortical thymic epithelial cell
+184	corticothalamic-projecting glutamatergic cortical neuron
+185	cytotoxic T cell
+186	decidual cell
+187	decidual natural killer cell, human
+188	dendritic cell
+189	dendritic cell, human
+190	dermis microvascular lymphatic vessel endothelial cell
+191	deuterosomal cell
+192	differentiation-committed oligodendrocyte precursor
+193	diffuse bipolar 1 cell
+194	diffuse bipolar 2 cell
+195	diffuse bipolar 3a cell
+196	diffuse bipolar 3b cell
+197	diffuse bipolar 4 cell
+198	diffuse bipolar 6 cell
+199	direct pathway medium spiny neuron
+200	double negative T regulatory cell
+201	double negative thymocyte
+202	double-positive, alpha-beta thymocyte
+203	duct epithelial cell
+204	duodenum glandular cell
+205	early T lineage precursor
+206	early lymphoid progenitor
+207	early promyelocyte
+208	effector CD4-positive, alpha-beta T cell
+209	effector CD8-positive, alpha-beta T cell
+210	effector memory CD4-positive, alpha-beta T cell
+211	effector memory CD8-positive, alpha-beta T cell
+212	effector memory CD8-positive, alpha-beta T cell, terminally differentiated
+213	elicited macrophage
+214	embryonic fibroblast
+215	embryonic stem cell
+216	endocardial cell
+217	endocrine cell
+218	endosteal cell
+219	endothelial cell
+220	endothelial cell of artery
+221	endothelial cell of hepatic sinusoid
+222	endothelial cell of lymphatic vessel
+223	endothelial cell of pericentral hepatic sinusoid
+224	endothelial cell of periportal hepatic sinusoid
+225	endothelial cell of placenta
+226	endothelial cell of sinusoid
+227	endothelial cell of uterus
+228	endothelial cell of vascular tree
+229	endothelial cell of venule
+230	endothelial tip cell
+231	enteric neuron
+232	enteric smooth muscle cell
+233	enterocyte
+234	enterocyte of colon
+235	enterocyte of epithelium of large intestine
+236	enterocyte of epithelium of small intestine
+237	enteroendocrine cell
+238	enteroendocrine cell of colon
+239	enteroendocrine cell of small intestine
+240	enucleate erythrocyte
+241	enucleated reticulocyte
+242	eosinophil
+243	ependymal cell
+244	epicardial adipocyte
+245	epidermal Langerhans cell
+246	epidermal cell
+247	epithelial cell
+248	epithelial cell of alveolus of lung
+249	epithelial cell of esophagus
+250	epithelial cell of exocrine pancreas
+251	epithelial cell of lacrimal sac
+252	epithelial cell of lower respiratory tract
+253	epithelial cell of lung
+254	epithelial cell of nephron
+255	epithelial cell of prostate
+256	epithelial cell of proximal tubule
+257	epithelial cell of proximal tubule segment 1
+258	epithelial cell of proximal tubule segment 3
+259	epithelial cell of small intestine
+260	epithelial cell of stratum germinativum of esophagus
+261	epithelial cell of sweat gland
+262	epithelial cell of thymus
+263	epithelial cell of urethra
+264	epithelial cell of uterus
+265	erythroblast
+266	erythrocyte
+267	erythroid lineage cell
+268	erythroid progenitor cell
+269	erythroid progenitor cell, mammalian
+270	eurydendroid cell
+271	exhausted T cell
+272	extravillous trophoblast
+273	eye photoreceptor cell
+274	fast muscle cell
+275	fetal cardiomyocyte
+276	fibro/adipogenic progenitor cell
+277	fibroblast
+278	fibroblast of breast
+279	fibroblast of cardiac tissue
+280	fibroblast of connective tissue of glandular part of prostate
+281	fibroblast of connective tissue of nonglandular part of prostate
+282	fibroblast of lung
+283	fibroblast of mammary gland
+284	flat midget bipolar cell
+285	follicular B cell
+286	follicular dendritic cell
+287	forebrain neuroblast
+288	forebrain radial glial cell
+289	foveolar cell of stomach
+290	fraction A pre-pro B cell
+291	gamma-delta T cell
+292	ganglion interneuron
+293	germ cell
+294	germinal center B cell
+295	giant bipolar cell
+296	glandular cell of esophagus
+297	glandular epithelial cell
+298	glial cell
+299	glioblast
+300	glomerular capillary endothelial cell
+301	glomerular endothelial cell
+302	glutamatergic neuron
+303	glycinergic amacrine cell
+304	goblet cell
+305	granular cell of epidermis
+306	granule cell
+307	granulocyte
+308	granulocyte monocyte progenitor cell
+309	granulosa cell
+310	group 2 innate lymphoid cell
+311	group 2 innate lymphoid cell, human
+312	group 3 innate lymphoid cell
+313	group 3 innate lymphoid cell, human
+314	gut endothelial cell
+315	hair follicular keratinocyte
+316	helper T cell
+317	hematopoietic cell
+318	hematopoietic multipotent progenitor cell
+319	hematopoietic precursor cell
+320	hematopoietic stem cell
+321	hepatic pit cell
+322	hepatic stellate cell
+323	hepatoblast
+324	hepatocyte
+325	immature B cell
+326	immature NK T cell
+327	immature Schwann cell
+328	immature alpha-beta T cell
+329	immature astrocyte
+330	immature innate lymphoid cell
+331	immature natural killer cell
+332	indirect pathway medium spiny neuron
+333	inflammatory cell
+334	inflammatory macrophage
+335	inhibitory interneuron
+336	inhibitory motor neuron
+337	innate lymphoid cell
+338	intermediate monocyte
+339	interneuron
+340	interstitial cell of Cajal
+341	interstitial cell of ovary
+342	intestinal crypt stem cell
+343	intestinal crypt stem cell of colon
+344	intestinal crypt stem cell of large intestine
+345	intestinal crypt stem cell of small intestine
+346	intestinal enteroendocrine cell
+347	intestinal epithelial cell
+348	intestinal tuft cell
+349	intestine goblet cell
+350	intraepithelial lymphocyte
+351	intrahepatic cholangiocyte
+352	invaginating midget bipolar cell
+353	ionocyte
+354	keratinocyte
+355	keratocyte
+356	kidney capillary endothelial cell
+357	kidney cell
+358	kidney collecting duct cell
+359	kidney collecting duct intercalated cell
+360	kidney collecting duct principal cell
+361	kidney connecting tubule epithelial cell
+362	kidney connecting tubule principal cell
+363	kidney distal convoluted tubule epithelial cell
+364	kidney epithelial cell
+365	kidney interstitial alternatively activated macrophage
+366	kidney interstitial cell
+367	kidney interstitial fibroblast
+368	kidney loop of Henle ascending limb epithelial cell
+369	kidney loop of Henle epithelial cell
+370	kidney loop of Henle thick ascending limb epithelial cell
+371	kidney loop of Henle thin ascending limb epithelial cell
+372	kidney loop of Henle thin descending limb epithelial cell
+373	kidney resident macrophage
+374	lactocyte
+375	lamp5 GABAergic cortical interneuron
+376	large intestine goblet cell
+377	large pre-B-II cell
+378	late pro-B cell
+379	late promyelocyte
+380	lens epithelial cell
+381	lens fiber cell
+382	leukocyte
+383	liver dendritic cell
+384	luminal adaptive secretory precursor cell of mammary gland
+385	luminal cell of prostate epithelium
+386	luminal epithelial cell of mammary gland
+387	luminal hormone-sensing cell of mammary gland
+388	lung ciliated cell
+389	lung goblet cell
+390	lung interstitial macrophage
+391	lung macrophage
+392	lung microvascular endothelial cell
+393	lung neuroendocrine cell
+394	lung perichondrial fibroblast
+395	lung pericyte
+396	lung resident memory CD4-positive, alpha-beta T cell
+397	lung resident memory CD8-positive, alpha-beta T cell
+398	lung secretory cell
+399	lymphocyte
+400	lymphoid lineage restricted progenitor cell
+401	macroglial cell
+402	macrophage
+403	macrophage dendritic cell progenitor
+404	malignant cell
+405	mammary gland epithelial cell
+406	mast cell
+407	mature B cell
+408	mature NK T cell
+409	mature T cell
+410	mature alpha-beta T cell
+411	mature astrocyte
+412	mature conventional dendritic cell
+413	mature gamma-delta T cell
+414	mature microglial cell
+415	medium spiny neuron
+416	medullary thymic epithelial cell
+417	megakaryocyte
+418	megakaryocyte progenitor cell
+419	megakaryocyte-erythroid progenitor cell
+420	melanocyte
+421	melanocyte of skin
+422	memory B cell
+423	memory T cell
+424	memory regulatory T cell
+425	meningeal macrophage
+426	mesangial cell
+427	mesenchymal cell
+428	mesenchymal lymphangioblast
+429	mesenchymal stem cell
+430	mesodermal cell
+431	mesothelial cell
+432	mesothelial cell of epicardium
+433	mesothelial cell of pleura
+434	mesothelial fibroblast
+435	metallothionein-positive alveolar macrophage
+436	microfold cell of epithelium of small intestine
+437	microglial cell
+438	midget ganglion cell of retina
+439	midzonal region hepatocyte
+440	migratory enteric neural crest cell
+441	monocyte
+442	monocyte-derived dendritic cell
+443	mononuclear cell
+444	mononuclear phagocyte
+445	motor neuron
+446	mucosal invariant T cell
+447	mucous neck cell
+448	mucus secreting cell
+449	multi-ciliated epithelial cell
+450	mural cell
+451	muscle cell
+452	muscle precursor cell
+453	myelinating Schwann cell
+454	myelocyte
+455	myeloid cell
+456	myeloid dendritic cell
+457	myeloid dendritic cell, human
+458	myeloid leukocyte
+459	myeloid lineage restricted progenitor cell
+460	myoblast
+461	myoepithelial cell
+462	myoepithelial cell of mammary gland
+463	myofibroblast cell
+464	myometrial cell
+465	naive B cell
+466	naive T cell
+467	naive regulatory T cell
+468	naive thymus-derived CD4-positive, alpha-beta T cell
+469	naive thymus-derived CD8-positive, alpha-beta T cell
+470	nasal mucosa goblet cell
+471	natural T-regulatory cell
+472	natural killer cell
+473	near-projecting glutamatergic cortical neuron
+474	neoplastic cell
+475	neural cell
+476	neural crest cell
+477	neural progenitor cell
+478	neuroblast (sensu Vertebrata)
+479	neuroendocrine cell
+480	neuron
+481	neuron associated cell
+482	neuron associated cell (sensu Vertebrata)
+483	neuronal brush cell
+484	neuronal receptor cell
+485	neutrophil
+486	neutrophil progenitor cell
+487	non-classical monocyte
+488	non-myelinating Schwann cell
+489	non-pigmented ciliary epithelial cell
+490	non-terminally differentiated cell
+491	noradrenergic cell
+492	oligodendrocyte
+493	oligodendrocyte precursor cell
+494	osteoblast
+495	osteoclast
+496	ovarian surface epithelial cell
+497	pancreatic A cell
+498	pancreatic D cell
+499	pancreatic PP cell
+500	pancreatic acinar cell
+501	pancreatic ductal cell
+502	pancreatic endocrine cell
+503	pancreatic epsilon cell
+504	pancreatic stellate cell
+505	paneth cell
+506	paneth cell of colon
+507	paneth cell of epithelium of small intestine
+508	papillary tips cell
+509	parasol ganglion cell of retina
+510	parietal cell
+511	parietal epithelial cell
+512	peptic cell
+513	pericyte
+514	peripheral blood mononuclear cell
+515	peripheral nervous system neuron
+516	periportal region hepatocyte
+517	perivascular cell
+518	photoreceptor cell
+519	pigmented ciliary epithelial cell
+520	pigmented epithelial cell
+521	placental villous trophoblast
+522	plasma cell
+523	plasmablast
+524	plasmacytoid dendritic cell
+525	plasmacytoid dendritic cell, human
+526	platelet
+527	pneumocyte
+528	podocyte
+529	pre-B-I cell
+530	pre-conventional dendritic cell
+531	pre-natural killer cell
+532	preadipocyte
+533	precursor B cell
+534	precursor cell
+535	preosteoblast
+536	prickle cell
+537	primary cultured cell
+538	primary sensory neuron (sensu Teleostei)
+539	primitive red blood cell
+540	primordial germ cell
+541	pro-B cell
+542	pro-T cell
+543	proerythroblast
+544	professional antigen presenting cell
+545	progenitor cell
+546	progenitor cell of endocrine pancreas
+547	progenitor cell of mammary luminal epithelium
+548	promonocyte
+549	promyelocyte
+550	prostate gland microvascular endothelial cell
+551	pulmonary artery endothelial cell
+552	pulmonary interstitial fibroblast
+553	pulmonary ionocyte
+554	pvalb GABAergic cortical interneuron
+555	radial glial cell
+556	regular atrial cardiac myocyte
+557	regular ventricular cardiac myocyte
+558	regulatory T cell
+559	renal alpha-intercalated cell
+560	renal beta-intercalated cell
+561	renal intercalated cell
+562	renal interstitial pericyte
+563	renal principal cell
+564	respiratory basal cell
+565	respiratory epithelial cell
+566	respiratory goblet cell
+567	respiratory hillock cell
+568	respiratory suprabasal cell
+569	reticular cell
+570	reticulocyte
+571	retina horizontal cell
+572	retinal astrocyte
+573	retinal bipolar neuron
+574	retinal blood vessel endothelial cell
+575	retinal cone cell
+576	retinal ganglion cell
+577	retinal pigment epithelial cell
+578	retinal rod cell
+579	rod bipolar cell
+580	salivary gland cell
+581	sebaceous gland cell
+582	sebum secreting cell
+583	secondary lens fiber
+584	secretory cell
+585	sensory neuron
+586	serous cell of epithelium of bronchus
+587	serous cell of epithelium of trachea
+588	serous secreting cell
+589	serous secreting cell of bronchus submucosal gland
+590	skeletal muscle fiber
+591	skeletal muscle fibroblast
+592	skeletal muscle satellite cell
+593	skeletal muscle satellite stem cell
+594	skin fibroblast
+595	slow muscle cell
+596	small intestine goblet cell
+597	small pre-B-II cell
+598	smooth muscle cell
+599	smooth muscle cell of prostate
+600	smooth muscle cell of sphincter of pupil
+601	smooth muscle cell of the pulmonary artery
+602	smooth muscle myoblast
+603	sncg GABAergic cortical interneuron
+604	sperm
+605	squamous epithelial cell
+606	sst GABAergic cortical interneuron
+607	sst chodl GABAergic cortical interneuron
+608	starburst amacrine cell
+609	stellate neuron
+610	stem cell
+611	stem cell of epidermis
+612	stratified epithelial cell
+613	stromal cell
+614	stromal cell of endometrium
+615	stromal cell of ovary
+616	subcutaneous adipocyte
+617	supporting cell
+618	suprabasal keratinocyte
+619	surface ectodermal cell
+620	sympathetic neuron
+621	syncytiotrophoblast cell
+622	taste receptor cell
+623	tendon cell
+624	theca cell
+625	thymocyte
+626	thyroid follicular cell
+627	tongue muscle cell
+628	tonsil germinal center B cell
+629	tracheal goblet cell
+630	tracheobronchial goblet cell
+631	tracheobronchial serous cell
+632	tracheobronchial smooth muscle cell
+633	transit amplifying cell
+634	transit amplifying cell of colon
+635	transit amplifying cell of small intestine
+636	transitional stage B cell
+637	trophoblast giant cell
+638	tuft cell of colon
+639	type A enteroendocrine cell
+640	type B pancreatic cell
+641	type D enteroendocrine cell
+642	type EC enteroendocrine cell
+643	type G enteroendocrine cell
+644	type I NK T cell
+645	type I enteroendocrine cell
+646	type I pneumocyte
+647	type II pneumocyte
+648	type L enteroendocrine cell
+649	type N enteroendocrine cell
+650	unipolar brush cell
+651	unknown
+652	unswitched memory B cell
+653	urothelial cell
+654	uterine smooth muscle cell
+655	vasa recta ascending limb cell
+656	vasa recta descending limb cell
+657	vascular associated smooth muscle cell
+658	vascular leptomeningeal cell
+659	vascular lymphangioblast
+660	vein endothelial cell
+661	ventricular cardiac muscle cell
+662	vip GABAergic cortical interneuron
+663	visceromotor neuron
