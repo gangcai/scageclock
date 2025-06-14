@@ -61,10 +61,23 @@ def training_pipeline(model_name: str = "GMA",
                       cat_n_embed: int = 4,  ## number of embedding for the categorical feature, only used in eGMA
                       K_fold_mode: bool = False,
                       K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
-                      K_fold_val: tuple[str] = ("Fold5"),
+                      K_fold_val: str = "Fold5",
                       **kwargs
                       ):
     start_time = time.time()
+
+    if (device == 'cuda') and (not torch.cuda.is_available()):
+        if torch.backends.mps.is_available():
+            # exclude xgboost and catboost to use mps device
+            if model_name in ["GMA","linear","MLP"]:
+                print("warning: cuda is not available, and found MAC mps, which is used instead")
+                device = 'mps'
+            else:
+                device = 'cpu'
+        else:
+            print("warning: cuda is not available, and the cpu is used instead")
+            device = "cpu"
+
 
     # default value for dataset_folder_dict if it is None
     if K_fold_mode and (dataset_folder_dict is None):
@@ -425,7 +438,16 @@ def load_GMA_model(model_file,
                            l1_lambda=l1_lambda,
                            l2_lambda=l2_lambda,
                            num_heads=num_heads)
-        GMA_model.load_state_dict(torch.load(model_file))
+        if torch.backends.mps.is_available():
+            print("Mac mps is found, and device is set to be mps")
+            device = 'mps'
+        elif torch.cuda.is_available():
+            print("Cuda is found, and device is set to be cuda")
+            device = "cuda"
+        else:
+            print("warning: both of cuda and mps are not available, and the cpu is used instead")
+            device = "cpu"
+        GMA_model.load_state_dict(torch.load(model_file, map_location=torch.device(device)))
         return GMA_model
     elif model_file_type == "pkl":
         with open(model_file, 'rb') as file:  # 'rb' stands for read binary
