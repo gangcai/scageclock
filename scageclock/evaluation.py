@@ -42,7 +42,7 @@ def prediction(model_file: str,
     y_predicted = y_predicted.flatten().detach()
     y_true = list(adata.obs[age_col])
     y_predicted = list(np.array(y_predicted))
-    age_diff = np.array(y_true) - np.array(y_predicted)
+    age_diff = np.array(y_predicted) - np.array(y_true)
 
     cell_df = pd.DataFrame({"cell_id": list(adata.obs[cell_id_col]),
                             "cell_age_true": y_true,
