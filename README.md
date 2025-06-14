@@ -3,6 +3,10 @@ scAgeClock: a single-cell human aging clock model based on gated multi-head atte
 ## installation
 pip install scageclock
 ## example
+### example data and model
+- example data can be found at data/pytest_data
+- example GMA model file can be found at data/trained_models/GMA_models
+
 ### making age prediction
 ```python
 from scageclock.evaluation import prediction
@@ -61,6 +65,28 @@ results = training_pipeline(model_name=model_name,
 			validation_during_training=False,
 			loader_method=loader_method,
 			out_root_dir=out_root_dir)
+```
+
+### model training with cross-validation (catboost)
+```python
+from scageclock.scAgeClock import training_pipeline
+model_name = "catboost" # Gated Multihead Attention Neural Network, default model of scAgeClock
+ad_dir_root = "data/pytest_data/train_val_test_mode/"
+meta_file = "data/pytest_data/pytest_dataset_metadata.parquet"
+dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
+predict_dataset = "testing"
+loader_method = "scageclock"
+out_root_dir = "./tmp/"
+results = training_pipeline(model_name=model_name,
+			    ad_dir_root=ad_dir_root,
+			    meta_file_path=meta_file,
+			    dataset_folder_dict=dataset_folder_dict,
+			    predict_dataset=predict_dataset,
+			    validation_during_training=True,
+			    loader_method=loader_method,
+			    train_dataset_fully_loaded=True, ##make sure the memory is enough
+			    out_root_dir=out_root_dir)
+
 ```
 ## about
 authors: Gangcai Xie (Medical School of Nantong University); [ORCID](https://orcid.org/0000-0002-8286-2987)
