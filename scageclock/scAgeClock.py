@@ -30,6 +30,7 @@ from .model.XGBoost import XGBoostAgeClock
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
                       feature_size: int = 19183, # 19031,
+                      out_root_dir: str = "./",
                       suffix: str = "pb",
                       run_id: str = "v1",
                       ad_dir_root: str = "./db/",
@@ -84,7 +85,7 @@ def training_pipeline(model_name: str = "GMA",
         raise ValueError(f"Input model not supported: {model_name}!")
 
     #settings
-    outdir = f"{model_name}_out_{suffix}/"
+    outdir = os.path.join(out_root_dir,f"{model_name}_out_{suffix}/")
     if not os.path.exists(outdir):
         os.mkdir(outdir)
         print(f"create folder {outdir}")
