@@ -18,6 +18,7 @@ numpy = "~1.26.4"
 pandas = "~2.2.2"
 matplotlib = "~3.9.2"
 pyarrow = "~16.1.0"
+openpyxl = "~3.1.5"
 
 
 [[tool.poetry.source]]
@@ -32,6 +33,9 @@ ipython = "^9.3.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.poetry.scripts]
+scAgeClock = "scageclock.cli:main"
 
 [build-system]
 requires = ["poetry-core"]
