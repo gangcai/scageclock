@@ -1,4 +1,5 @@
 import pytest
+import torch
 from ..scageclock.model.GatedMultiheadAttention import GatedMultiheadAttentionAgeClock
 from scipy.stats import pearsonr
 
@@ -37,6 +38,16 @@ def test_GMAAgeClock(validation_during_training,
     else:
         balanced_dataloader_parameters = None
 
+    if torch.backends.mps.is_available():
+        print("Mac mps is found, and device is set to be mps")
+        device = 'mps'
+    elif torch.cuda.is_available():
+        print("Cuda is found, and device is set to be cuda")
+        device = "cuda"
+    else:
+        print("Both of cuda and mps are not available, and the cpu is used instead")
+        device = "cpu"
+
     if K_fold_mode:
         dataset_folder_dict = {"training_validation": "train_val"}
         age_clock = GatedMultiheadAttentionAgeClock(anndata_dir_root=k_fold_data_dir,
@@ -46,7 +57,8 @@ def test_GMAAgeClock(validation_during_training,
                                                     loader_method=loader_method,
                                                     K_fold_mode=K_fold_mode,
                                                     K_fold_train=("Fold1", "Fold2"),
-                                                    K_fold_val=("Fold3"),
+                                                    K_fold_val="Fold3",
+                                                    device=device
                                                     )
     else:
         dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
@@ -58,7 +70,8 @@ def test_GMAAgeClock(validation_during_training,
                                                     loader_method=loader_method,
                                                     batch_size_train=64,
                                                     batch_size_val=64,
-                                                    batch_size_test=64,)
+                                                    batch_size_test=64,
+                                                    device=device)
     age_clock.train()
     predict_list = age_clock.predict()
     corr, p_value = pearsonr(predict_list[0], predict_list[1])
