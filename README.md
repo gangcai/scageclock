@@ -5,7 +5,7 @@ pip install scageclock
 ## about data
 - feature file: data/metadata/h5ad_var.tsv
 - categorical index: data/metadata/categorical_features_index (assay, sex, tissue_general, and cell_type)
-- h5ad example file: data/pytest_data/k_fold_mode/train_val/Fold1/Pytest_Fold1_200K_chunk27.h5ad (example h5ad from 200K sampling results)
+- h5ad example file: data/pytest_data/k_fold_mode/train_val/Fold1/Pytest_Fold1_200K_chunk27.h5ad (500 cells sampled)
 
 ## example
 ### example data and model
