@@ -414,8 +414,19 @@ def predict(model,
     return age_predicted.squeeze().detach()
 
 
-def get_feature_importance(model):
-    return model.get_feature_importance()
+def get_feature_importance(model,
+                           feature_file: str | None = None,
+                           feature_colname: str = "h5ad_var"):
+    if feature_file is None:
+        return model.get_feature_importance()
+    else:
+        if os.path.exists(feature_file):
+            feature_importance = model.get_feature_importance()
+            feature_id_df = pd.read_csv(feature_file, sep="\t")
+            feature_id_lst = list(feature_id_df[feature_colname])
+            results = pd.DataFrame({"feature_name":feature_id_lst,
+                                    "feature_importance":feature_importance})
+            return results
 
 
 def load_GMA_model(model_file,
