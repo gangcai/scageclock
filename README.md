@@ -3,9 +3,18 @@ scAgeClock: a single-cell human aging clock model based on gated multi-head atte
 ## installation
 pip install scageclock
 ## about data
+### data basic
 - feature file: data/metadata/h5ad_var.tsv
 - categorical index: data/metadata/categorical_features_index (assay, sex, tissue_general, and cell_type)
 - h5ad example file: data/pytest_data/k_fold_mode/train_val/Fold1/Pytest_Fold1_200K_chunk27.h5ad (500 cells sampled)
+- shape of anndata from h5ad file: N x 19183, where N is the number of cells
+
+### anndata example
+```bash
+AnnData object with n_obs × n_vars = 500 × 19183
+    obs: 'soma_joinid', 'age'
+    var: 'feature_id', 'feature_name'
+```
 
 ## example
 ### example data and model
