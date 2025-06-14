@@ -54,7 +54,7 @@ def test_training_pipeline(model_name,
                                         predict_dataset=predict_dataset,
                                         K_fold_mode=K_fold_mode,
                                         K_fold_train=("Fold1", "Fold2"),
-                                        K_fold_val=("Fold3"),
+                                        K_fold_val="Fold3",
                                         validation_during_training=validation_during_training,
                                         loader_method=loader_method,
                                         out_root_dir=out_root_dir)
