@@ -8,7 +8,7 @@ pip install scageclock
 - example GMA model file can be found at "data/trained_models/GMA_models" of this repository
 
 ### current supported model types
-- $${\color{red}GMA (Gated Multi-head Attention Neural Networks, default and recommended)}$$
+- $${\color{red}GMA\space(Gated \space Multi-head \space Attention \space Neural \space Networks, default \space and \space recommended)}$$
 - MLP (Multilayer Perceptron)
 - linear (Elastic Net based Linear regression model)
 - xgboost 
