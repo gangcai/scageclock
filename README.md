@@ -2,6 +2,11 @@
 scAgeClock: a single-cell human aging clock model based on gated multi-head attention neural networks and single-cell transcriptome
 ## installation
 pip install scageclock
+## about data
+- feature file: data/metadata/h5ad_var.tsv
+- categorical index: data/metadata/categorical_features_index (assay, sex, tissue_general, and cell_type)
+- h5ad example file: data/pytest_data/k_fold_mode/train_val/Fold1/Pytest_Fold1_200K_chunk27.h5ad (example h5ad from 200K sampling results)
+
 ## example
 ### example data and model
 - example data can be found at "data/pytest_data" of this repository
@@ -19,6 +24,7 @@ pip install scageclock
 from scageclock.evaluation import prediction
 model_file="./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
 h5ad_folder="./data/pytest_data/train_val_test_mode/test/"
+h5ad_feature_file="./data/metadata/h5ad_var.tsv"
 results_df = prediction(model_file=model_file,
 		    h5ad_dir=h5ad_folder)
 ```
@@ -28,6 +34,17 @@ results_df = prediction(model_file=model_file,
 model_file="./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
 h5ad_folder="./data/pytest_data/train_val_test_mode/test/"
 scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --output_file './tmp/test_predicted.xlsx'
+```
+
+### get model feature importance (GMA model)###
+```python
+from scageclock.scAgeClock import load_GMA_model, get_feature_importance
+model_file = "./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
+gma_model = load_GMA_model(model_file)
+feature_file = "data/metadata/h5ad_var.tsv"
+feature_importance = get_feature_importance(gma_model,feature_file=feature_file)
+#sort by feature importance score
+feature_importance = feature_importance.sort_values(by="feature_importance",ascending=False)
 ```
 
 ### model training with validation and testing
@@ -95,6 +112,7 @@ results = training_pipeline(model_name=model_name,
 			    out_root_dir=out_root_dir)
 
 ```
+
 ## about
 - Author: Gangcai Xie (Medical School of Nantong University); 
 - [ORCID](https://orcid.org/0000-0002-8286-2987)
