@@ -5,3 +5,4 @@ scageclock/model/__pycache__/
 .idea
 .idea/misc.xml
 .idea/scageclock.iml
+dist/
