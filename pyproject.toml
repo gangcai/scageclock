@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "scageclock"
 version = "0.1.0"
-description = ""
+description = "scAgeClock: a single-cell human aging clock model based on gated multi-head attention neural networks and single-cell transcriptome"
 authors = ["Gangcai Xie <gcxiester@gmail.com>"]
 readme = "README.md"
+packages = [
+    {include = "scageclock"}
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
