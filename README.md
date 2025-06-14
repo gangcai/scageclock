@@ -7,6 +7,13 @@ pip install scageclock
 - example data can be found at "data/pytest_data" of this repository
 - example GMA model file can be found at "data/trained_models/GMA_models" of this repository
 
+### current supported model types
+- <span style="color:red"> GMA (Gated Multi-head Attention Neural Networks, default and recommended)</span>
+- MLP (Multilayer Perceptron)
+- linear (Elastic Net based Linear regression model)
+- xgboost 
+- catboost
+
 ### making age prediction
 ```python
 from scageclock.evaluation import prediction
@@ -23,7 +30,7 @@ h5ad_folder="./data/pytest_data/train_val_test_mode/test/"
 scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --output_file './tmp/test_predicted.xlsx'
 ```
 
-### model training with testing
+### model training with validation and testing
 ```python
 from scageclock.scAgeClock import training_pipeline
 model_name = "GMA" # Gated Multihead Attention Neural Network, default model of scAgeClock
