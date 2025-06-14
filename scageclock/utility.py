@@ -318,12 +318,17 @@ def anndata_formatting(adata,
 
     return adata_f
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
 # CAI: Cell-based Aging Index
-def get_CAI(age_diff):
-    age_diff_min = min(age_diff)
-    age_diff_max = max(age_diff)
-    age_diff_range = age_diff_max - age_diff_min
-    CAI = (age_diff - age_diff_min) / age_diff_range
+def get_CAI(age_true,
+            age_predicted,
+            norm_size: int = 25):
+    age_true = np.array(age_true)
+    age_predicted = np.array(age_predicted)
+    age_diff = age_predicted - age_true
+    CAI = sigmoid(age_diff/norm_size)
     return CAI
 
 
