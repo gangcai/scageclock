@@ -4,8 +4,8 @@ scAgeClock: a single-cell human aging clock model based on gated multi-head atte
 pip install scageclock
 ## example
 ### example data and model
-- example data can be found at data/pytest_data
-- example GMA model file can be found at data/trained_models/GMA_models
+- example data can be found at "data/pytest_data" of this repository
+- example GMA model file can be found at "data/trained_models/GMA_models" of this repository
 
 ### making age prediction
 ```python
@@ -89,4 +89,5 @@ results = training_pipeline(model_name=model_name,
 
 ```
 ## about
-authors: Gangcai Xie (Medical School of Nantong University); [ORCID](https://orcid.org/0000-0002-8286-2987)
+- Author: Gangcai Xie (Medical School of Nantong University); 
+- [ORCID](https://orcid.org/0000-0002-8286-2987)
