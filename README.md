@@ -1,5 +1,5 @@
 # scAgeClock
-scAgeClock: a single-cell human aging clock model based on gated multi-head attention neural networks and single-cell transcriptome
+scAgeClock: a single-cell transcriptome based human aging clock model using gated multi-head attention neural networks
 ## installation
 pip install scageclock
 ## about data
