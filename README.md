@@ -45,7 +45,7 @@ h5ad_folder="./data/pytest_data/train_val_test_mode/test/"
 scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --output_file './tmp/test_predicted.xlsx'
 ```
 
-### get model feature importance (GMA model)###
+### get model feature importance (GMA model)
 ```python
 from scageclock.scAgeClock import load_GMA_model, get_feature_importance
 model_file = "./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
@@ -76,7 +76,7 @@ results = training_pipeline(model_name=model_name,
 			    out_root_dir=out_root_dir)
 ```
 
-### model training with cross-validation
+### model training with cross-validation mode (one round)
 ```python
 from scageclock.scAgeClock import training_pipeline
 model_name = "GMA" # Gated Multihead Attention Neural Network, default model of scAgeClock
@@ -100,7 +100,7 @@ results = training_pipeline(model_name=model_name,
 			out_root_dir=out_root_dir)
 ```
 
-### model training with cross-validation (catboost)
+### model training with cross-validation mode (one round and catboost)
 ```python
 from scageclock.scAgeClock import training_pipeline
 model_name = "catboost" # Gated Multihead Attention Neural Network, default model of scAgeClock
