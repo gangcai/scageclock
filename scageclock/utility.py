@@ -321,22 +321,22 @@ def anndata_formatting(adata,
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
-# CAI: Cell-based Aging Index
-def get_CAI(age_true,
+# calculate cell-level Aging Deviation Index (ADI)
+def get_ADI(age_true,
             age_predicted,
             norm_size: int = 25):
     age_true = np.array(age_true)
     age_predicted = np.array(age_predicted)
     age_diff = age_predicted - age_true
-    CAI = sigmoid(age_diff/norm_size)
-    return CAI
+    ADI = sigmoid(age_diff/norm_size)
+    return ADI
 
 
 
 
-def calculate_CAI_correlation(ad, score_column='CAI'):
+def calculate_ADI_correlation(ad, score_column='ADI'):
     """
-    Calculate Pearson correlations and p-values between gene expression and CAI score in AnnData.
+    Calculate Pearson correlations and p-values between gene expression and ADI score in AnnData.
 
     Parameters:
     -----------
