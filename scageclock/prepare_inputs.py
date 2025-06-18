@@ -140,7 +140,7 @@ class InputsPrepare:
     def ad_normalize(self, adata):
         if not self.backed_load is None:
             adata = adata.to_memory()
-        sc.pp.normalize_total(adata)
+        sc.pp.normalize_total(adata) # TODO: optimize the normalization
         # Logarithmize the data
         sc.pp.log1p(adata)
         return adata
