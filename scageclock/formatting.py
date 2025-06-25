@@ -64,7 +64,11 @@ def format_anndata_single_category(adata_raw,
                                    assay: str = "10x 3' v3",
                                    sex: str = "male",
                                    tissue_general: str = "brain",
-                                   cell_type="neuron"):
+                                   cell_type="neuron",
+                                   normalization_target_sum: int | None = None,
+                                   normalization_exclude_highly_expressed: bool = False,
+                                   normalization_max_fraction: float = 0.05
+                                   ):
     cat_cols = ["assay", "cell_type", "tissue_general", "sex"]
     cat_dict = {}
     for cat in cat_cols:
@@ -101,8 +105,12 @@ def format_anndata_single_category(adata_raw,
 
     if normalize:
         ## normalize the gene expression data based on all filtered genes
-        # Normalizing to median total counts
-        sc.pp.normalize_total(adata)
+        # Normalizing to median total counts (default)
+        sc.pp.normalize_total(adata,
+                              target_sum=normalization_target_sum,
+                              exclude_highly_expressed=normalization_exclude_highly_expressed,
+                              max_fraction=normalization_max_fraction
+                              )
         # Logarithmize the data
         sc.pp.log1p(adata)
         print(f"shape during normalization: {adata.shape}")
@@ -127,7 +135,11 @@ def format_anndata_single_category(adata_raw,
 def format_anndata_multiple(adata_raw, # gene_name should be in adata_raw.var_names
                             model_genes,  ## genes used in the scageclock Model
                             normalize: bool = True,
-                            cat_cols: None | list[str] = None):
+                            cat_cols: None | list[str] = None,
+                            normalization_target_sum: int | None = None,
+                            normalization_exclude_highly_expressed: bool = False,
+                            normalization_max_fraction: float = 0.05
+                            ):
 
     if cat_cols is None:
         cat_cols = ["assay_index", "cell_type_index", "tissue_index", "sex_index"]
@@ -145,7 +157,11 @@ def format_anndata_multiple(adata_raw, # gene_name should be in adata_raw.var_na
     if normalize:
         ## normalize the gene expression data based on all filtered genes
         # Normalizing to median total counts
-        sc.pp.normalize_total(adata)
+        sc.pp.normalize_total(adata,
+                              target_sum=normalization_target_sum,
+                              exclude_highly_expressed=normalization_exclude_highly_expressed,
+                              max_fraction=normalization_max_fraction
+                              )
         # Logarithmize the data
         sc.pp.log1p(adata)
         print(f"shape during normalization: {adata.shape}")
