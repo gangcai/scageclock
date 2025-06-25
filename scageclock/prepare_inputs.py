@@ -24,7 +24,10 @@ class InputsPrepare:
                  cat_cols =("assay", "cell_type", "tissue_general", "sex"),
                  cat_folder = "../meta_data/categorical_numeric_index/",
                  test_mode: bool = False,
-                 test_mode_num: int = 5):
+                 test_mode_num: int = 5,
+                 normalization_target_sum: int | None = None,
+                 normalization_exclude_highly_expressed: bool = False,
+                 normalization_max_fraction: float = 0.05):
 
         self.h5ad_files_path = h5ad_files_path
         self.meta_file = meta_file
@@ -42,6 +45,11 @@ class InputsPrepare:
         self.cat_cols = list(cat_cols)
         self.cat_folder = cat_folder
         self.test_mode = test_mode
+
+        #for normalization setting
+        self.normalization_target_sum = normalization_target_sum
+        self.normalization_exclude_highly_expressed = normalization_exclude_highly_expressed
+        self.normalization_max_fraction = normalization_max_fraction
 
         if not os.path.exists(self.outdir):
             os.makedirs(self.outdir, exist_ok=True)
@@ -140,7 +148,10 @@ class InputsPrepare:
     def ad_normalize(self, adata):
         if not self.backed_load is None:
             adata = adata.to_memory()
-        sc.pp.normalize_total(adata) # TODO: optimize the normalization
+        sc.pp.normalize_total(adata,
+                              target_sum=self.normalization_target_sum,
+                              exclude_highly_expressed=self.normalization_exclude_highly_expressed,
+                              max_fraction=self.normalization_max_fraction) # TODO: optimize the normalization
         # Logarithmize the data
         sc.pp.log1p(adata)
         return adata
