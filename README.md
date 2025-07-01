@@ -55,8 +55,8 @@ from scageclock.evaluation import prediction
 - shape of anndata from h5ad file: N x 19183, where N is the number of cells
 
 ### Anndata structure of scAgeClock's Input Dataset
-## 19183 features, including 4 categorical features (the first four columns, in the order of assay, cell_type, tissue_general, and sex) and 19179 selected protein coding genes
 ```bash
+## 19183 features, including 4 categorical features (the first four columns, in the order of assay, cell_type, tissue_general, and sex) and 19179 selected protein coding genes
 AnnData object with n_obs × n_vars = 500 × 19183
     obs: 'soma_joinid', 'age'
     var: 'feature_id', 'feature_name'
