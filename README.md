@@ -64,6 +64,7 @@ AnnData object with n_obs × n_vars = 500 × 19183
 ### Formatting your data to scAgeClock's Inputs Format
 <details>
 <summary> Click to check the data formatting example code</summary>
+
 ```python
 import scanpy as sc
 import pandas as pd
@@ -76,6 +77,7 @@ split_dfs = np.array_split(filtered_meta_df, 10) ## split the cells into 10 chun
 ###load the matching table for the categorical features and update the .obs dataframe of the original anndata
 meta_df = raw_adata_all.obs
 cat_index_dict = {}
+# matching table needs to be created based on your input anndata's .obs dataframe
 # Example matching table files can be found in ./scageclock/data/example/data_formatting/obs_columns_matching_examples
 for cat in ["assay","cell_type","tissue","sex"]:
     df = pd.read_excel(f"../{cat}_matching_table.xlsx")
@@ -117,6 +119,7 @@ for chunk_df in split_dfs:
 
 ```
 </details>
+
 
 ## scAgeClock model training and age prediction examples
 ### about example data and model
