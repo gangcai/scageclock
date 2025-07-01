@@ -14,7 +14,15 @@ results_df = prediction(model_file=model_file,
 		    h5ad_dir=h5ad_folder)
 ```
 ## Installation
-### install from package
+### install from PyPI
+```
+% conda create -n scAgeClock
+% conda activate scAgeClock
+% conda install python=3.12
+% pip install scageclock
+```
+
+### install from latest package
 ```
 % conda create -n scAgeClock
 % conda activate scAgeClock
@@ -45,10 +53,6 @@ from scageclock.scAgeClock import training_pipeline
 from scageclock.evaluation import prediction
 ```
 
-### install from remote repository
-```
-% pip install scageclock
-```
 ## Information About scAgeClock's Input Dataset
 ###  Input Dataset examples
 - feature file: data/metadata/h5ad_var.tsv
