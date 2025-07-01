@@ -1,6 +1,22 @@
 # scAgeClock
 scAgeClock: a single-cell transcriptome based human aging clock model using gated multi-head attention neural networks
+## Quick Start
+### making age prediction by scAgeClock (command-line version)
+```bash
+scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --output_file ${out_file}
+```
+### making age prediction by scAgeClock (python)
+```python
+from scageclock.evaluation import prediction
+model_file="scAgeClock_GMA.pth" ## pre-trained scAgeClock GMA model provided by scAgeClock
+h5ad_folder="/path/to/h5adfiles/" ## scAgeClock formatted .h5ad files
+results_df = prediction(model_file=model_file,
+		    h5ad_dir=h5ad_folder)
+```
 ## installation
+### install from package
+pip install scageclock.0.1.1.tar.gz
+### install from remote repository
 pip install scageclock
 ## about data
 ### data basic
@@ -16,14 +32,14 @@ AnnData object with n_obs × n_vars = 500 × 19183
     var: 'feature_id', 'feature_name'
 ```
 
-## example
+## examples
 ### example data and model
 - example data can be found at "data/pytest_data" of this repository
 - example GMA model file can be found at "data/trained_models/GMA_models" of this repository
 
 ### current supported model types
 - $${\color{red}GMA\space(Gated \space Multi-head \space Attention \space Neural \space Networks, default \space and \space recommended)}$$
-- MLP (Multilayer Perceptron)
+- MLP (Multi-layer Perceptron)
 - linear (Elastic Net based Linear regression model)
 - xgboost 
 - catboost
@@ -33,7 +49,6 @@ AnnData object with n_obs × n_vars = 500 × 19183
 from scageclock.evaluation import prediction
 model_file="./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
 h5ad_folder="./data/pytest_data/train_val_test_mode/test/"
-h5ad_feature_file="./data/metadata/h5ad_var.tsv"
 results_df = prediction(model_file=model_file,
 		    h5ad_dir=h5ad_folder)
 ```
