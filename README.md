@@ -5,7 +5,7 @@ scAgeClock: a single-cell transcriptome based human aging clock model using gate
 ```bash
 scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --output_file ${out_file}
 ```
-### making age prediction by scAgeClock (python)
+### making age prediction by scAgeClock (python-script version)
 ```python
 from scageclock.evaluation import prediction
 model_file="scAgeClock_GMA.pth" ## pre-trained scAgeClock GMA model provided by scAgeClock
@@ -13,7 +13,7 @@ h5ad_folder="/path/to/h5adfiles/" ## scAgeClock formatted .h5ad files
 results_df = prediction(model_file=model_file,
 		    h5ad_dir=h5ad_folder)
 ```
-## installation
+## Installation
 ### install from package
 ```
 % conda create -n scAgeClock_v0.1.1
@@ -47,19 +47,76 @@ from scageclock.evaluation import prediction
 ```
 % pip install scageclock
 ```
-## Information About scAgeClock's Inputs Dataset
-### data basic
+## Information About scAgeClock's Input Dataset
+###  Input Dataset examples
 - feature file: data/metadata/h5ad_var.tsv
 - categorical index: data/metadata/categorical_features_index (assay, sex, tissue_general, and cell_type)
 - h5ad example file: data/pytest_data/k_fold_mode/train_val/Fold1/Pytest_Fold1_200K_chunk27.h5ad (500 cells sampled)
 - shape of anndata from h5ad file: N x 19183, where N is the number of cells
 
-### anndata example
+### Anndata structure of scAgeClock's Input Dataset
+## 19183 features, including 4 categorical features (the first four columns, in the order of assay, cell_type, tissue_general, and sex) and 19179 selected protein coding genes
 ```bash
 AnnData object with n_obs × n_vars = 500 × 19183
     obs: 'soma_joinid', 'age'
     var: 'feature_id', 'feature_name'
 ```
+### Formatting your data to scAgeClock's Inputs Format
+<details>
+<summary> Click to check the data formatting example code</summary>
+```python
+import scanpy as sc
+import pandas as pd
+import numpy as np
+from scageclock.formatting import format_anndata_multiple
+raw_h5ad_file = "/your/raw/inputfile/example.h5ad"
+raw_adata_all = sc.read_h5ad(raw_h5ad_file,backed='r')
+meta_df = pd.read_parquet("example_meta.parquet") ## metadata for example.h5ad
+split_dfs = np.array_split(filtered_meta_df, 10) ## split the cells into 10 chunks (to reduce memory loading while formatting)
+###load the matching table for the categorical features and update the .obs dataframe of the original anndata
+meta_df = raw_adata_all.obs
+cat_index_dict = {}
+# Example matching table files can be found in ./scageclock/data/example/data_formatting/obs_columns_matching_examples
+for cat in ["assay","cell_type","tissue","sex"]:
+    df = pd.read_excel(f"../{cat}_matching_table.xlsx")
+    cat_index_dict[cat] = df
+names_dict = {"platform":"assay",
+              "cellType1":"cell_type",
+              "tissue":"tissue",
+             "sex":"sex"}
+
+for original_colname in names_dict.keys():
+    model_colname = names_dict[original_colname]
+    cat_df = pd.DataFrame({"raw_id": meta_df[original_colname]})
+    cat_df_with_index = pd.merge(cat_df, 
+                                   cat_index_dict[model_colname], 
+                                   left_on="raw_id",
+                                   right_on="original_cat_name",
+                                  how="left")
+    meta_df[f"{model_colname}_index"] = list(cat_df_with_index["model_cat_index"])
+
+## update original obs dataframe with scAgeClock index added
+raw_adata_all.obs = meta_df
+
+### loading the model's feature file
+model_feature_df = pd.read_csv("./scageclock/data/metadata/h5ad_var.tsv",sep="\t")
+model_genes = list(model_feature_df["h5ad_var"])[4:] #get the model's gene features
+
+### refomat for each chunks
+chunk_id = 0
+for chunk_df in split_dfs:
+    chunk_id += 1
+    adata_chunk = raw_adata_all[list(chunk_df.index)].to_memory()
+    print(adata_chunk.obs_names[0])
+    adata_formatted = format_anndata_multiple(adata_raw=adata_chunk,
+                                             model_genes=model_genes,
+                                             normalize=True,
+                                             cat_cols=["assay_index", "cell_type_index", "tissue_index", "sex_index"])
+    print(chunk_id)
+    adata_formatted.write_h5ad(f"chunk{chunk_id}.h5ad")
+
+```
+</details>
 
 ## scAgeClock model training and age prediction examples
 ### about example data and model
