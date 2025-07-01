@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "scageclock"
 version = "0.1.1"
-description = "scAgeClock: a single-cell human aging clock model based on gated multi-head attention neural networks and single-cell transcriptome"
-authors = ["Gangcai Xie <gcxiester@gmail.com>"]
+description = "scAgeClock: a single-cell transcriptome based human aging clock model using gated multi-head attention neural networks"
+authors = ["Gangcai Xie <gcxiester@gmail.com> or <gangcai@ntu.edu.cn>"]
 readme = "README.md"
 packages = [
     {include = "scageclock"}
