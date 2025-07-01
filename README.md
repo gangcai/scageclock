@@ -29,6 +29,10 @@ results_df = prediction(model_file=model_file,
 % conda install python=3.12
 % pip install scageclock-0.1.2.tar.gz # download the latest release
 #check the command-line version
+```
+### check for the installation
+#### check scAgeClock command
+```
 % scAgeClock --help
 usage: scAgeClock [-h] [--model_file MODEL_FILE]
                   [--testing_h5ad_files_dir TESTING_H5AD_FILES_DIR]
@@ -47,6 +51,7 @@ options:
   --output_file OUTPUT_FILE
                         output file with predicted results
 ```
+#### check scAgeClock functions
 ```python
 #check the python imports
 from scageclock.scAgeClock import training_pipeline
