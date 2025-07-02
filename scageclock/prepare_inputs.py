@@ -27,7 +27,8 @@ class InputsPrepare:
                  test_mode_num: int = 5,
                  normalization_target_sum: int | None = None,
                  normalization_exclude_highly_expressed: bool = False,
-                 normalization_max_fraction: float = 0.05):
+                 normalization_max_fraction: float = 0.05,
+                 normalization_filtered: bool = False):
 
         self.h5ad_files_path = h5ad_files_path
         self.meta_file = meta_file
@@ -50,6 +51,7 @@ class InputsPrepare:
         self.normalization_target_sum = normalization_target_sum
         self.normalization_exclude_highly_expressed = normalization_exclude_highly_expressed
         self.normalization_max_fraction = normalization_max_fraction
+        self.normalization_filtered = normalization_filtered ## if True, normalization is done on the filtered genes; otherwise, is done on all the original genes
 
         if not os.path.exists(self.outdir):
             os.makedirs(self.outdir, exist_ok=True)
@@ -205,8 +207,13 @@ class InputsPrepare:
                     if h5ad_chunk.shape[0] == self.chunk_size:
                         chunk_id_num += 1
                         print(f"write chunk{chunk_id_num} to file with complete chunk size:{h5ad_chunk.shape}")
-                        h5ad_chunk = self.ad_normalize(h5ad_chunk)  ## normalize based on all the genes
-                        h5ad_chunk_s = h5ad_chunk[:, h5ad_chunk.var["feature_id"].isin(gene_lst)]  ## filter genes
+                        if self.normalization_filtered:
+                            h5ad_chunk_s = h5ad_chunk[:, h5ad_chunk.var["feature_id"].isin(gene_lst)]  ## filter genes
+                            h5ad_chunk_s = self.ad_normalize(h5ad_chunk_s) ## normalize based on the filtered genes
+                        else:
+                            h5ad_chunk = self.ad_normalize(h5ad_chunk)  ## normalize based on all the genes
+                            h5ad_chunk_s = h5ad_chunk[:, h5ad_chunk.var["feature_id"].isin(gene_lst)]  ## filter genes
+
                         self.format_and_write(h5ad_chunk_s,
                                               prefix=f"{prefix1}_Chunk{chunk_id_num}",)
                     else:
