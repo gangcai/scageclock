@@ -138,7 +138,8 @@ def format_anndata_multiple(adata_raw, # gene_name should be in adata_raw.var_na
                             cat_cols: None | list[str] = None,
                             normalization_target_sum: int | None = None,
                             normalization_exclude_highly_expressed: bool = False,
-                            normalization_max_fraction: float = 0.05
+                            normalization_max_fraction: float = 0.05,
+                            normalization_filtered: bool = False
                             ):
 
     if cat_cols is None:
@@ -146,30 +147,46 @@ def format_anndata_multiple(adata_raw, # gene_name should be in adata_raw.var_na
 
     cat_df = adata_raw.obs[cat_cols]
     # make adata_raw contain all model genes
+    print(f"shape of original data : {adata_raw.shape}")
     adata = update_anndata_with_missing_genes(adata_raw, model_genes)
-
-    #adata_raw.var_names = adata_raw.var[gene_column]
-
-    #adata = adata_raw
 
     obs_df = adata.obs
 
+    print(f"shape of original data after adding missing model genes: {adata.shape}")
     if normalize:
-        ## normalize the gene expression data based on all filtered genes
-        # Normalizing to median total counts
-        sc.pp.normalize_total(adata,
-                              target_sum=normalization_target_sum,
-                              exclude_highly_expressed=normalization_exclude_highly_expressed,
-                              max_fraction=normalization_max_fraction
-                              )
-        # Logarithmize the data
-        sc.pp.log1p(adata)
-        print(f"shape during normalization: {adata.shape}")
+        if normalization_filtered:
+            ## filter by model genes
+            adata = adata[:, model_genes]
+            print(f"shape after model gene selection: {adata.shape}")
+            ## normalize and scale
+            sc.pp.normalize_total(adata,
+                                  target_sum=normalization_target_sum,
+                                  exclude_highly_expressed=normalization_exclude_highly_expressed,
+                                  max_fraction=normalization_max_fraction
+                                  )
+            # Logarithmize the data
+            sc.pp.log1p(adata)
+            print(f"shape during normalization: {adata.shape}")
+        else:
+            ## normalize and scale
+            sc.pp.normalize_total(adata,
+                                  target_sum=normalization_target_sum,
+                                  exclude_highly_expressed=normalization_exclude_highly_expressed,
+                                  max_fraction=normalization_max_fraction
+                                  )
+            # Logarithmize the data
+            sc.pp.log1p(adata)
+            print(f"shape during normalization: {adata.shape}")
 
-    ## filter by protein coding genes
-    adata = adata[:, model_genes]
+            ## filter by protein coding genes
+            adata = adata[:, model_genes]
+            print(f"shape after model gene selection: {adata.shape}")
+    else:
+        ## filter by model genes
+        adata = adata[:, model_genes]
+        print(f"shape after model gene selection: {adata.shape}")
 
-    print(f"shape after protein coding selection: {adata.shape}")
+
 
     # merge categorical features and gene expression features
     X_merged = hstack([csr_matrix(cat_df), adata.X])
