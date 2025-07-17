@@ -191,7 +191,9 @@ class InputsPrepare:
                 meta_data_s = meta_data_s[meta_data_s[self.meta_file_split_second_column] == self.fold_id]
 
             soma_ids_f = meta_data_s["soma_joinid"]
-            adata_f = ad[ad.obs["soma_joinid"].isin(list(soma_ids_f))]
+
+            # use copy of the view of anndata
+            adata_f = ad[ad.obs["soma_joinid"].isin(list(soma_ids_f))].to_memory().copy()
             if adata_f.shape[0] == 0:
                 print(f"skipped for {i}, no {self.split_tag} data")
                 continue
