@@ -23,7 +23,7 @@ def donor_level_test(meta_file_path: str,
                      cell_id_column: str = "soma_joinid",
                      donor_id_column: str = "donor_id_general",
                      method: str = "mean",
-                     id_convert_to_int: bool = True):
+                     id_convert_to_int: bool = False):
 
     if not method in ["mean","median"]:
         print("Error: method can only be one of ['mean', 'median']")
