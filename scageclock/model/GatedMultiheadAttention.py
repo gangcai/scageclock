@@ -38,6 +38,7 @@ class GatedMultiheadAttentionAgeClock:
                  patience: int = 3,
                  scheduler_factor: float = 0.5,
                  hidden_dim: int = 128,
+                 project_dim: int = 512,
                  num_heads: int = 8,
                  device: str = "cpu",
                  train_batch_iter_max: int | None = 100,  ## maximal number of iteration for the DataLoader during training
@@ -83,6 +84,7 @@ class GatedMultiheadAttentionAgeClock:
         :param scheduler_factor: Factor by which the learning rate will be
                                 reduced. new_lr = lr * factor.
         :param hidden_dim: dimension of the hidden layer for the Fully Connected Network (FC)
+        :param project_dim: dimension after projection layer
         :param num_heads: number of heads for Multi-head Attention
         :param device: device used for training: cpu , cuda
         :param train_batch_iter_max: early stop of batch iteration when reaching this number of batches for the training processes, not used if None
@@ -136,6 +138,7 @@ class GatedMultiheadAttentionAgeClock:
         self.patience = patience
         self.scheduler_factor = scheduler_factor
         self.hidden_dim = hidden_dim
+        self.project_dim = project_dim
         self.num_heads = num_heads
         self.epochs = epochs
         self.device = device
@@ -204,6 +207,7 @@ class GatedMultiheadAttentionAgeClock:
                                                   num_numeric_features= feature_size-len(self.cat_card_list),
                                                   n_embed=self.n_embed,
                                                   hidden_dim=self.hidden_dim,
+                                                  project_dim=self.project_dim,
                                                   l1_lambda=self.l1_lambda,
                                                   l2_lambda=self.l2_lambda,
                                                   num_heads=self.num_heads,
@@ -436,8 +440,8 @@ class GatedMultiheadAttentionFCNet(nn.Module):
                  cat_cardinalities,
                  num_numeric_features,
                  n_embed=4,
-                 hidden_dim = 256,
-                 embed_dim=512,
+                 hidden_dim=256,
+                 project_dim=512,
                  l1_lambda=0.1,
                  l2_lambda=0.1,
                  num_heads=8,
@@ -461,14 +465,14 @@ class GatedMultiheadAttentionFCNet(nn.Module):
         self.feature_gate = FeatureGate(input_size,
                                         l1_lambda=l1_lambda,
                                         l2_lambda=l2_lambda)
-        self.projection = nn.Linear(input_size, embed_dim)
-        self.attention = MultiheadAttention(embed_dim, num_heads)
+        self.projection = nn.Linear(input_size, project_dim)
+        self.attention = MultiheadAttention(project_dim, num_heads)
         self.fc = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
+            nn.Linear(project_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 1)
         )
-        self.norm = nn.LayerNorm(embed_dim)  # Normalization for stability
+        self.norm = nn.LayerNorm(project_dim)  # Normalization for stability
 
     def forward(self, x):
         x_cat = x[:, :len(self.embeddings)].long()  # First 4 columns: categorical
