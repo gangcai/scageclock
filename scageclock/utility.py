@@ -16,29 +16,34 @@ from scipy.sparse import issparse
 
 
 ## get the validation metrics based on the true donor age and the predicted donor age
-## TODO: add other method, such as squared mean
 def donor_level_test(meta_file_path: str,
                      test_soma_joinids: List,
                      y_test_true: List,
                      y_test_predict: List,
                      cell_id_column: str = "soma_joinid",
                      donor_id_column: str = "donor_id_general",
-                     method: str = "mean"):
+                     method: str = "mean",
+                     id_convert_to_int: bool = True):
 
     if not method in ["mean","median"]:
         print("Error: method can only be one of ['mean', 'median']")
         return False
 
     meta_df = pd.read_parquet(meta_file_path) # should contain at least two clumns: "soma_joinid" and "donor_id_general"
-    test_donor_ids = []
-    for test_soma_id in test_soma_joinids:
-        test_soma_id = int(test_soma_id)
-        donor_id_general = meta_df[meta_df[cell_id_column] == int(test_soma_id)][donor_id_column].values[0]
-        test_donor_ids.append(donor_id_general)
 
-    test_donor_df = pd.DataFrame({"donor": test_donor_ids,
+    ## convert the cell id from the test_soma_joinids to int dtype
+    if id_convert_to_int:
+        test_soma_joinids = np.array(test_soma_joinids,dtype=int)
+
+    cell_level_df = pd.DataFrame({cell_id_column:test_soma_joinids,
                                   "test_true": y_test_true,
                                   "test_pre": y_test_predict})
+
+    meta_df_s = meta_df[[cell_id_column,donor_id_column]]
+
+    # merge by cell id (dtype should be matched)
+    test_donor_df = pd.merge(cell_level_df, meta_df_s, how="left", on=cell_id_column)
+    test_donor_df = test_donor_df.rename(columns={donor_id_column: "donor"})
 
     ## use donor cell-level mean age as the donor age
     donor_true_age = None
