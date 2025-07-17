@@ -53,7 +53,7 @@ def training_pipeline(model_name: str = "GMA",
                       device: str = "cuda",
                       loss: str = "MSE",
                       model_save_method: str = "stat_dict",
-                      # supports one of [stat_dict, pkl, joblib, cbm] , cbm (for catboost)
+                      # supports one of [stat_dict, pkl, joblib, cbm, bin] , cbm for catboost, bin for xgboost
                       get_feature_importance: bool = False,
                       boost_depth: int = 6,
                       boost_iteration: int = 100,
