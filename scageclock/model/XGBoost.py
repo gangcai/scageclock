@@ -244,7 +244,7 @@ class XGBoostAgeClock:
                     if self.validation_during_training:
                         self.model.fit(X_train, y_train, eval_set=[(X_train, y_train), (self.X_val, self.y_val)])
                     else:
-                        self.model.fit(X_train, y_train)
+                        self.model.fit(X_train, y_train, eval_set = [(X_train, y_train)])
                 else:
                     if self.validation_during_training:
                         self.model.fit(X_train, y_train,
@@ -252,6 +252,7 @@ class XGBoostAgeClock:
                                        xgb_model=self.model.get_booster())
                     else:
                         self.model.fit(X_train, y_train,
+                                       eval_set=[(X_train, y_train)],
                                        xgb_model=self.model.get_booster())
 
                 if self.validation_during_training:
