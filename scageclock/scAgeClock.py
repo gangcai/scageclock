@@ -410,7 +410,10 @@ def predict(model,
     elif (device == 'cuda') and (inputs_device_name == 'cpu'):
         inputs = inputs.to("cuda")
 
-    age_predicted = model(inputs)
+    model.eval()  # don't miss this, otherwise the prediction will be different
+    with torch.no_grad():
+        age_predicted = model(inputs)
+
     return age_predicted.squeeze().detach()
 
 
