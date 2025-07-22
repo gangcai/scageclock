@@ -21,6 +21,8 @@ def prediction(model_file: str,
                output_file: str | None = None,
                ):
     model = load_GMA_model(model_file=model_file, model_file_type=model_file_type)
+    model.eval() # don't miss this, otherwise the prediction will be different
+
 
     if h5ad_dir is not None:
         h5ad_files = glob.glob(f"{h5ad_dir}/*.h5ad")
@@ -35,22 +37,23 @@ def prediction(model_file: str,
         if adata is None:
             raise ValueError("Inputs error")
 
-    X_inputs = adata.X.toarray()
-    X_inputs_tensor = torch.from_numpy(X_inputs)
-    X_inputs_tensor = X_inputs_tensor.to(torch.float32)
-    y_predicted = model(X_inputs_tensor)
-    y_predicted = y_predicted.flatten().detach()
-    y_true = list(adata.obs[age_col])
-    y_predicted = list(np.array(y_predicted))
-    age_diff = np.array(y_predicted) - np.array(y_true)
+    with torch.no_grad():
+        X_inputs = adata.X.toarray()
+        X_inputs_tensor = torch.from_numpy(X_inputs)
+        X_inputs_tensor = X_inputs_tensor.to(torch.float32)
+        y_predicted = model(X_inputs_tensor)
+        y_predicted = y_predicted.flatten().detach()
+        y_true = list(adata.obs[age_col])
+        y_predicted = list(np.array(y_predicted))
+        age_diff = np.array(y_predicted) - np.array(y_true)
 
-    cell_df = pd.DataFrame({"cell_id": list(adata.obs[cell_id_col]),
-                            "cell_age_true": y_true,
-                            "cell_age_predicted": y_predicted,
-                            "cell_age_diff": age_diff})
+        cell_df = pd.DataFrame({"cell_id": list(adata.obs[cell_id_col]),
+                                "cell_age_true": y_true,
+                                "cell_age_predicted": y_predicted,
+                                "cell_age_diff": age_diff})
 
-    if output_file is not None:
-        cell_df.to_excel(output_file)
+        if output_file is not None:
+            cell_df.to_excel(output_file)
 
     return cell_df
 
