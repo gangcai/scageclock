@@ -27,7 +27,7 @@ results_df = prediction(model_file=model_file,
 % conda create -n scAgeClock
 % conda activate scAgeClock
 % conda install python=3.12
-% pip install scageclock-0.1.2.tar.gz # download the latest release
+% pip install scageclock-0.1.3.tar.gz # download the latest release
 ```
 ### check for the installation
 #### check scAgeClock command
@@ -62,12 +62,12 @@ from scageclock.evaluation import prediction
 - feature file: data/metadata/h5ad_var.tsv
 - categorical index: data/metadata/categorical_features_index (assay, sex, tissue_general, and cell_type)
 - h5ad example file: data/pytest_data/k_fold_mode/train_val/Fold1/Pytest_Fold1_200K_chunk27.h5ad (500 cells sampled)
-- shape of anndata from h5ad file: N x 19183, where N is the number of cells
+- shape of anndata from h5ad file: N x 19238, where N is the number of cells
 
 ### Anndata structure of scAgeClock's Input Dataset
 ```bash
-## 19183 features, including 4 categorical features (the first four columns, in the order of assay, cell_type, tissue_general, and sex) and 19179 selected protein coding genes
-AnnData object with n_obs × n_vars = 500 × 19183
+## 19238 features, including 4 categorical features (the first four columns, in the order of assay, cell_type, tissue_general, and sex) and 19179 selected protein coding genes
+AnnData object with n_obs × n_vars = 500 × 19238
     obs: 'soma_joinid', 'age'
     var: 'feature_id', 'feature_name'
 ```
