@@ -1,7 +1,7 @@
 import scanpy as sc
 import os
 import glob
-ad_dir="/home/gangcai/projects/human_aging_clock/scageclock/datasets_cross_validation/train_val_1M_Age_Balanced/train_val/Fold1/"
+ad_dir="/home/gangcai/projects/human_aging_clock/final/protein_coding/benchmark/benchmark_data/train_val_1M_Age_Balanced/train_val/Fold1"
 
 i = 0
 ad_files = glob.glob(f"{ad_dir}/*.h5ad")
