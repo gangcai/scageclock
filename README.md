@@ -8,7 +8,7 @@ scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --
 ### making age prediction by scAgeClock (python-script version)
 ```python
 from scageclock.evaluation import prediction
-model_file="scAgeClock_GMA.pth" ## pre-trained scAgeClock GMA model provided by scAgeClock
+model_file="scAgeClock_GMA_model_state_dict.pth" ## pre-trained scAgeClock GMA model provided by scAgeClock
 h5ad_folder="/path/to/h5adfiles/" ## scAgeClock formatted .h5ad files
 results_df = prediction(model_file=model_file,
 		    h5ad_dir=h5ad_folder)
@@ -134,7 +134,7 @@ for chunk_df in split_dfs:
 ## scAgeClock model training and age prediction examples
 ### about example data and model
 - example data can be found at "data/pytest_data" of this repository
-- example GMA model file can be found at "data/trained_models/GMA_models" of this repository
+- example GMA model file can be found at "data/trained_models" of this repository
 
 ### current supported model types
 - $${\color{red}GMA\space(Gated \space Multi-head \space Attention \space Neural \space Networks, default \space and \space recommended)}$$
@@ -146,7 +146,7 @@ for chunk_df in split_dfs:
 ### making age prediction (python script version)
 ```python
 from scageclock.evaluation import prediction
-model_file="./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
+model_file="./data/trained_models/scAgeClock_GMA_model_state_dict.pth"
 h5ad_folder="./data/pytest_data/train_val_test_mode/test/"
 results_df = prediction(model_file=model_file,
 		    h5ad_dir=h5ad_folder)
@@ -154,7 +154,7 @@ results_df = prediction(model_file=model_file,
 ### making age prediction (command-line version)
 ```bash
 #!/bin/bash
-model_file="./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
+model_file="./data/trained_models/scAgeClock_GMA_model_state_dict.pth"
 h5ad_folder="./data/pytest_data/train_val_test_mode/test/"
 scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --output_file './tmp/test_predicted.xlsx'
 ```
@@ -162,7 +162,7 @@ scAgeClock --model_file ${model_file} --testing_h5ad_files_dir ${h5ad_folder} --
 ### get model feature importance (GMA model)
 ```python
 from scageclock.scAgeClock import load_GMA_model, get_feature_importance
-model_file = "./data/trained_models/GMA_models/GMA_celltype_balanced_basicRun.pth"
+model_file = "./data/trained_models/scAgeClock_GMA_model_state_dict.pth"
 gma_model = load_GMA_model(model_file)
 feature_file = "data/metadata/h5ad_var.tsv"
 feature_importance = get_feature_importance(gma_model,feature_file=feature_file)
