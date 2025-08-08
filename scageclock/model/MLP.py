@@ -13,7 +13,7 @@ class MLPAgeClock:
     def __init__(self,
                  anndata_dir_root: str,
                  dataset_folder_dict: dict | None = None,
-                 feature_size: int = 19183,
+                 feature_size: int = 19238,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
                  cat_card_list: list | None = None,
@@ -42,6 +42,7 @@ class MLPAgeClock:
                  K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
                  K_fold_val: str = "Fold5",
                  device: str = "cpu",
+                 log_step: int = 100,
                  log_file: str = "MLPAgeClock_log.txt"):
         if cat_card_list is None:
             # ['assay', 'cell_type', 'tissue_general', 'sex'],
@@ -92,6 +93,7 @@ class MLPAgeClock:
         self.batch_train_loss_list = []
         self.batch_val_loss_list = []
 
+        self.log_step = log_step
         self.log_file = log_file
         # Configure logging
         logging.basicConfig(filename=self.log_file, level=logging.INFO)
@@ -193,7 +195,8 @@ class MLPAgeClock:
         start_time = time.perf_counter()
         print("Start training")
         logging.info("Start training")
-        for epoch in range(self.epochs):
+        for epoch_ in range(self.epochs):
+            epoch = epoch_ + 1 # start from 1
             total_train_loss = 0
             iter_num = 0
             train_samples_num = 0
@@ -222,7 +225,7 @@ class MLPAgeClock:
                 total_train_loss += loss.item() * inputs.size(0)
                 iter_num += 1
                 train_samples_num += inputs.size(0) ## TODO: check
-                if iter_num % 100 ==1:
+                if iter_num % self.log_step ==1:
                     end_time = time.perf_counter()
                     logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (training stage)")
                     logging.info(f"training loss: {loss.item()}")
@@ -240,7 +243,7 @@ class MLPAgeClock:
                         loss = self.criterion(outputs, targets)
                         all_batch_val_loss_list.append(loss.item())
                         total_val_loss += loss.item() * inputs.size(0)
-                        if iter_num % 100 == 1:
+                        if iter_num % self.log_step == 1:
                             end_time = time.perf_counter()
                             logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
                             logging.info(f"validation loss: {loss.item()}")
@@ -258,8 +261,8 @@ class MLPAgeClock:
                 f"accumulated time relapsed for epoch {epoch} : {end_time - start_time} seconds (training stage)")
             # Calculate average training loss (use total number of samples)
             avg_train_loss = total_train_loss / train_samples_num
-            print(f"Epoch {epoch + 1}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
-            logging.info(f"Epoch {epoch + 1}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
+            print(f"Epoch {epoch}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
+            logging.info(f"Epoch {epoch}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
             epoch_train_loss_list.append(avg_train_loss)
 
             if self.validation_during_training:
@@ -268,8 +271,8 @@ class MLPAgeClock:
                 # Calculate average validation loss (use total number of samples)
                 avg_val_loss = total_val_loss / train_samples_num
                 epoch_val_loss_list.append(avg_val_loss)
-                print(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
-                logging.info(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+                print(f"Epoch {epoch}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+                logging.info(f"Epoch {epoch}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
 
                 # Update the learning rate scheduler
                 self.scheduler.step(avg_val_loss)
