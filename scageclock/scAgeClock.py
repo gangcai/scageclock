@@ -435,11 +435,16 @@ def get_feature_importance(model,
 def load_GMA_model(model_file,
                    model_file_type: str = "pth",
                    cat_cardinalities: list[int] | None = None,
-                   num_numeric_features: int = 19179, # 19183-4,
-                   hidden_dim: int = 128,
-                   l1_lambda: float = 0.001,
-                   l2_lambda: float = 0,
+                   num_numeric_features: int = 19234,
+                   projection_dim=512,
+                   prediction_hidden_sizes: list[int] | None = None,
+                   l1_lambda: float = 0.1,
+                   l2_lambda: float = 0.5,
                    num_heads: int = 8,):
+    # default cardinalities for each categorical feature column
+    if prediction_hidden_sizes is None:
+        prediction_hidden_sizes = [256, 128]
+
     if cat_cardinalities is None:
         # ['assay', 'cell_type', 'tissue_general', 'sex'],
         # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
@@ -448,7 +453,8 @@ def load_GMA_model(model_file,
     if model_file_type == "pth":
         GMA_model = GMANet(cat_cardinalities=cat_cardinalities,
                            num_numeric_features=num_numeric_features,
-                           hidden_dim=hidden_dim,
+                           projection_dim=projection_dim,
+                           prediction_hidden_sizes=prediction_hidden_sizes,
                            l1_lambda=l1_lambda,
                            l2_lambda=l2_lambda,
                            num_heads=num_heads)
@@ -462,6 +468,27 @@ def load_GMA_model(model_file,
             print("warning: both of cuda and mps are not available, and the cpu is used instead")
             device = "cpu"
         GMA_model.load_state_dict(torch.load(model_file, map_location=torch.device(device)))
+        return GMA_model
+    elif model_file_type == "checkpoint_pth":
+        GMA_model = GMANet(cat_cardinalities=cat_cardinalities,
+                           num_numeric_features=num_numeric_features,
+                           projection_dim=projection_dim,
+                           prediction_hidden_sizes=prediction_hidden_sizes,
+                           l1_lambda=l1_lambda,
+                           l2_lambda=l2_lambda,
+                           num_heads=num_heads)
+        if torch.backends.mps.is_available():
+            print("Mac mps is found, and device is set to be mps")
+            device = 'mps'
+        elif torch.cuda.is_available():
+            print("Cuda is found, and device is set to be cuda")
+            device = "cuda"
+        else:
+            print("warning: both of cuda and mps are not available, and the cpu is used instead")
+            device = "cpu"
+        checkpoint = torch.load(model_file)
+        GMA_model.load_state_dict(checkpoint['model_state_dict'])
+        GMA_model = GMA_model.to(device=device)
         return GMA_model
     elif model_file_type == "pkl":
         with open(model_file, 'rb') as file:  # 'rb' stands for read binary
