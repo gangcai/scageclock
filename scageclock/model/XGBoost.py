@@ -111,7 +111,7 @@ class XGBoostAgeClock:
                  ## load all .h5ad prediction files into memory and concatenate into one anndata
                  validation_dataset_fully_loaded: bool = False,
                  train_batch_iter_max: int = 1,  ## maximal number of batch iteration for model training
-                 predict_batch_iter_max: int = 20,
+                 predict_batch_iter_max: int | None = 20,
                  K_fold_mode: bool = False,
                  K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
                  K_fold_val: str = "Fold5",
@@ -342,8 +342,9 @@ class XGBoostAgeClock:
                 soma_ids_all.extend(soma_ids.numpy())
                 test_samples_num += features.size(0)
                 iter_num += 1
-                if iter_num >= self.predict_batch_iter_max:
-                    break
+                if not self.predict_batch_iter_max is None:
+                    if iter_num >= self.predict_batch_iter_max:
+                        break
         else:
             if not self.K_fold_mode:
                 print("prediction based on all prediction datasets, all of which is loaded into memory")
