@@ -8,7 +8,6 @@ import logging
 from ..utility import get_validation_metrics
 import numpy as np
 
-# TODO: add model checkpoint
 class GatedMultiheadAttentionAgeClock:
 
     def __init__(self,
@@ -16,7 +15,7 @@ class GatedMultiheadAttentionAgeClock:
                  dataset_folder_dict: dict | None = None,
                  predict_dataset: str = "testing",
                  validation_during_training: bool = True,
-                 feature_size: int = 19183, # 19031,
+                 feature_size: int = 19238,
                  cat_card_list: list[int] | None = None,
                  n_embed: int = 4,
                  var_file_name: str = "h5ad_var.tsv",
@@ -37,8 +36,8 @@ class GatedMultiheadAttentionAgeClock:
                  weight_decay: float = 0.001,
                  patience: int = 3,
                  scheduler_factor: float = 0.5,
-                 hidden_dim: int = 128,
-                 project_dim: int = 512,
+                 projection_dim=512, # should be dividable by the header number of the multi-head attention's
+                 prediction_hidden_sizes: list[int] | None = None,
                  num_heads: int = 8,
                  device: str = "cpu",
                  train_batch_iter_max: int | None = 100,  ## maximal number of iteration for the DataLoader during training
@@ -50,8 +49,10 @@ class GatedMultiheadAttentionAgeClock:
                  K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
                  K_fold_val: str = "Fold5",
                  save_checkpoint: bool = False,
+                 checkpoint_step: int | None = None , ## save every this step number
                  checkpoint_outdir: str = "./checkpoints_saved", # only used when save_checkpoint is true
                  checkpoint_file_prefix: str = "GMA",
+                 log_step: int = 100,
                  log_file: str = "log.txt"):
         """
         Aging Clock based on Gated (Elastic Net) Multi-head Attention Neural Network
@@ -83,8 +84,8 @@ class GatedMultiheadAttentionAgeClock:
                         which the learning rate will be reduced.
         :param scheduler_factor: Factor by which the learning rate will be
                                 reduced. new_lr = lr * factor.
-        :param hidden_dim: dimension of the hidden layer for the Fully Connected Network (FC)
-        :param project_dim: dimension after projection layer
+        :param projection_dim: the output dimension of the projection layer
+        :param prediction_hidden_sizes: the hidden layer sizes for the prediction layer
         :param num_heads: number of heads for Multi-head Attention
         :param device: device used for training: cpu , cuda
         :param train_batch_iter_max: early stop of batch iteration when reaching this number of batches for the training processes, not used if None
@@ -94,13 +95,18 @@ class GatedMultiheadAttentionAgeClock:
         :param K_fold_mode: whether to use K_fold mode. Each-fold datasets should be under one folder
         :param K_fold_train: The K_fold folders under ad_files_path that are used for training
         :param K_fold_val: The K_fold folder under ad_files_path that are sued for validation
-        :param save_checkpoint: whether to save the checkpoints for each epoch
+        :param save_checkpoint: whether to save the checkpoints
+        :param checkpoint_step: save checkpoint every this number of steps,only works when save_checkpoint is True
         :param checkpoint_outdir: path to the outputs of checkpoint files, only works when save_checkpoint is True
         :param checkpoint_file_prefix: prefix for the output files of checkpoint
+        :param log_step: training steps interval to print the loss to log file
         :param log_file: log file
         """
 
         # default cardinalities for each categorical feature column
+        if prediction_hidden_sizes is None:
+            prediction_hidden_sizes = [256, 128]
+
         if cat_card_list is None:
             # default order of categorical columns: ['assay', 'cell_type', 'tissue_general', 'sex'],
             # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
@@ -137,8 +143,8 @@ class GatedMultiheadAttentionAgeClock:
         self.weight_decay = weight_decay
         self.patience = patience
         self.scheduler_factor = scheduler_factor
-        self.hidden_dim = hidden_dim
-        self.project_dim = project_dim
+        self.projection_dim = projection_dim
+        self.prediction_hidden_sizes = prediction_hidden_sizes
         self.num_heads = num_heads
         self.epochs = epochs
         self.device = device
@@ -157,10 +163,12 @@ class GatedMultiheadAttentionAgeClock:
         self.batch_train_loss_list = []
         self.batch_val_loss_list = []
         self.initial_model = initial_model
+        self.log_step = log_step
         self.log_file = log_file
 
 
         self.save_checkpoint = save_checkpoint
+        self.checkpoint_step = checkpoint_step
         self.checkpoint_outdir = checkpoint_outdir
         self.checkpoint_file_prefix = checkpoint_file_prefix
 
@@ -206,8 +214,8 @@ class GatedMultiheadAttentionAgeClock:
         self.model = GatedMultiheadAttentionFCNet(cat_cardinalities=self.cat_card_list,
                                                   num_numeric_features= feature_size-len(self.cat_card_list),
                                                   n_embed=self.n_embed,
-                                                  hidden_dim=self.hidden_dim,
-                                                  project_dim=self.project_dim,
+                                                  prediction_hidden_sizes=self.prediction_hidden_sizes,
+                                                  projection_dim=self.projection_dim,
                                                   l1_lambda=self.l1_lambda,
                                                   l2_lambda=self.l2_lambda,
                                                   num_heads=self.num_heads,
@@ -276,7 +284,8 @@ class GatedMultiheadAttentionAgeClock:
         start_time = time.perf_counter()
         print("Start training")
         logging.info("Start training")
-        for epoch in range(self.epochs):
+        for epoch_ in range(self.epochs):
+            epoch = epoch_ + 1 ## start from 1
             total_train_loss = 0
             iter_num = 0
             train_samples_num = 0
@@ -288,7 +297,6 @@ class GatedMultiheadAttentionAgeClock:
 
                 ########## Training phase  ############
                 self.model.train() ## re-set to train
-                # print(f"Process batch {iter_num}")
                 targets, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
                 self.optimizer.zero_grad()
                 inputs = inputs.to(self.device)
@@ -304,8 +312,21 @@ class GatedMultiheadAttentionAgeClock:
                 all_batch_train_loss_list.append(loss.item())
                 total_train_loss += loss.item() * inputs.size(0)
                 iter_num += 1
-                train_samples_num += inputs.size(0) ## TODO: check
-                if iter_num % 100 ==1:
+                train_samples_num += inputs.size(0)
+
+                if not self.checkpoint_step is None:
+                    if self.save_checkpoint and (iter_num % self.checkpoint_step == 0):
+                        cp_file = os.path.join(self.checkpoint_outdir,
+                                               f"{self.checkpoint_file_prefix}_epoch{epoch}_step{iter_num}.pth")
+                        # saving the checkpoint
+                        torch.save({'epoch': epoch,
+                                    "step": iter_num,
+                                    'model_state_dict': self.model.state_dict(),
+                                    'optimizer_state_dict': self.optimizer.state_dict(),
+                                    'train_avg_loss': None},
+                                   cp_file)
+
+                if iter_num % self.log_step ==1:
                     end_time = time.perf_counter()
                     logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (training stage)")
                     logging.info(f"training loss: {loss.item()}")
@@ -324,7 +345,7 @@ class GatedMultiheadAttentionAgeClock:
                         loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
                         all_batch_val_loss_list.append(loss.item())
                         total_val_loss += loss.item() * inputs.size(0)
-                        if iter_num % 100 == 1:
+                        if iter_num % self.log_step == 1:
                             end_time = time.perf_counter()
                             logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
                             logging.info(f"validation loss: {loss.item()}")
@@ -348,8 +369,8 @@ class GatedMultiheadAttentionAgeClock:
                 f"accumulated time relapsed for epoch {epoch} : {end_time - start_time} seconds (training stage)")
             # Calculate average training loss (use total number of samples)
             avg_train_loss = total_train_loss / train_samples_num
-            print(f"Epoch {epoch + 1}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
-            logging.info(f"Epoch {epoch + 1}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
+            print(f"Epoch {epoch}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
+            logging.info(f"Epoch {epoch}/{self.epochs}, Training Loss: {avg_train_loss:.4f}")
             epoch_train_loss_list.append(avg_train_loss)
 
             if self.validation_during_training:
@@ -357,8 +378,8 @@ class GatedMultiheadAttentionAgeClock:
                 # Calculate average validation loss (use total number of samples)
                 avg_val_loss = total_val_loss / train_samples_num
                 epoch_val_loss_list.append(avg_val_loss)
-                print(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
-                logging.info(f"Epoch {epoch + 1}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+                print(f"Epoch {epoch}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
+                logging.info(f"Epoch {epoch}/{self.epochs}, Validation Loss: {avg_val_loss:.4f}")
 
                 # Update the learning rate scheduler
                 self.scheduler.step(avg_val_loss)
@@ -369,6 +390,7 @@ class GatedMultiheadAttentionAgeClock:
                 cp_file = os.path.join(self.checkpoint_outdir, f"{self.checkpoint_file_prefix}_epoch{epoch}.pth" )
                 # saving the checkpoint
                 torch.save({'epoch': epoch,
+                            'step': iter_num,
                             'model_state_dict': self.model.state_dict(),
                             'optimizer_state_dict': self.optimizer.state_dict(),
                             'train_avg_loss': avg_train_loss},
@@ -440,14 +462,18 @@ class GatedMultiheadAttentionFCNet(nn.Module):
                  cat_cardinalities,
                  num_numeric_features,
                  n_embed=4,
-                 hidden_dim=256,
-                 project_dim=512,
+                 projection_dim=512, # should match with the header number
+                 prediction_hidden_sizes: list[int] | None = None,
                  l1_lambda=0.1,
                  l2_lambda=0.1,
                  num_heads=8,
+                 dropout_prob=0.2,
                  cat_feature_importance_method: str = "max",  # max, mean, sum
                  ):
         super().__init__()
+
+        if prediction_hidden_sizes is None:
+            prediction_hidden_sizes = [256,128]
 
         self.n_cats = len(cat_cardinalities)
 
@@ -465,14 +491,28 @@ class GatedMultiheadAttentionFCNet(nn.Module):
         self.feature_gate = FeatureGate(input_size,
                                         l1_lambda=l1_lambda,
                                         l2_lambda=l2_lambda)
-        self.projection = nn.Linear(input_size, project_dim)
-        self.attention = MultiheadAttention(project_dim, num_heads)
-        self.fc = nn.Sequential(
-            nn.Linear(project_dim, hidden_dim),
+        self.projection_layer = nn.Linear(input_size, projection_dim)
+
+        # Multihead attention
+        self.attention = MultiheadAttention(projection_dim, num_heads)
+
+        ## prediction layer
+        hidden_layers_p = nn.ModuleList()
+        for i in range(1, len(prediction_hidden_sizes)):
+            hidden_layers_p.append(nn.Sequential(
+                nn.Linear(prediction_hidden_sizes[i - 1], prediction_hidden_sizes[i]),
+                nn.ReLU(),  # Activation for each hidden layer
+                nn.Dropout(dropout_prob)  # Dropout for each hidden layer
+            ))
+
+        self.predict_layer = nn.Sequential(
+            nn.Linear(projection_dim, prediction_hidden_sizes[0]),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Dropout(dropout_prob),
+            *hidden_layers_p,
+            nn.Linear(prediction_hidden_sizes[-1], 1)
         )
-        self.norm = nn.LayerNorm(project_dim)  # Normalization for stability
+        self.norm = nn.LayerNorm(projection_dim)  # Normalization for stability
 
     def forward(self, x):
         x_cat = x[:, :len(self.embeddings)].long()  # First 4 columns: categorical
@@ -486,10 +526,10 @@ class GatedMultiheadAttentionFCNet(nn.Module):
         x_combined = torch.cat([x_embed, x_num], dim=1)
 
         x_combined = self.feature_gate(x_combined)  # Feature selection
-        x_combined = self.projection(x_combined)  # Dimensionality reduction
+        x_combined = self.projection_layer(x_combined)  # Dimensionality reduction
         x_combined = self.norm(x_combined)  # Normalize features
         x_combined = self.attention(x_combined.unsqueeze(1)).squeeze(1)  # Attention module
-        return self.fc(x_combined)  # Regression output
+        return self.predict_layer(x_combined)  # Regression output
 
     def get_feature_importance(self):
         with torch.no_grad():
