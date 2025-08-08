@@ -29,7 +29,7 @@ from .model.XGBoost import XGBoostAgeClock
 # TODO: change the saving method for xgboost
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
-                      feature_size: int = 19183, # 19031,
+                      feature_size: int = 19238,
                       out_root_dir: str = "./",
                       suffix: str = "pb",
                       run_id: str = "v1",
