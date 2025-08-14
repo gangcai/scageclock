@@ -222,7 +222,7 @@ class TorchElasticNetAgeClock:
                 total_train_loss += loss.item() * inputs.size(0)
                 iter_num += 1
                 train_samples_num += inputs.size(0) ## TODO: check
-                if iter_num % self.log_step ==1:
+                if iter_num % self.log_step ==0:
                     end_time = time.perf_counter()
                     logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (training stage)")
                     logging.info(f"training loss: {loss.item()}")
