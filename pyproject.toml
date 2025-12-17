@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scageclock"
-version = "0.1.3"
+version = "0.1.4"
 description = "scAgeClock: a single-cell transcriptome based human aging clock model using gated multi-head attention neural networks"
 authors = ["Gangcai Xie <gcxiester@gmail.com> or <gangcai@ntu.edu.cn>"]
 repository = "https://github.com/gangcai/scageclock"
