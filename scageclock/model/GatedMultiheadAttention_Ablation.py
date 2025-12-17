@@ -1,14 +1,14 @@
 import os.path
-
 import torch
-import torch.nn as nn
 from ..dataloader import BasicDataLoader
 import time
 import logging
 from ..utility import get_validation_metrics
 import numpy as np
+import torch.nn as nn
+from typing import Optional, List, Dict, Tuple
 
-class GatedMultiheadAttentionAgeClock:
+class GatedMultiheadAttentionAgeClockAblation:
 
     def __init__(self,
                  anndata_dir_root: str,
@@ -45,15 +45,16 @@ class GatedMultiheadAttentionAgeClock:
                  initial_model: str | None = None,
                  cat_feature_importance_method: str = "max",  # max, mean, sum
                  balanced_dataloader_parameters: dict | None = None,
-                 K_fold_mode: bool = False,
-                 K_fold_train: tuple[str] = ("Fold1", "Fold2", "Fold3", "Fold4"),
-                 K_fold_val: str = "Fold5",
                  save_checkpoint: bool = False,
                  checkpoint_step: int | None = None , ## save every this step number
                  checkpoint_outdir: str = "./checkpoints_saved", # only used when save_checkpoint is true
                  checkpoint_file_prefix: str = "GMA",
                  log_step: int = 100,
-                 log_file: str = "log.txt"):
+                 log_file: str = "log.txt",
+                 use_feature_gate: bool = True,  # Ablation control for FeatureGate
+                 use_attention: bool = True,  # Ablation control for MultiheadAttention
+                 ablation_mode: str = "complete",  # "complete", "replacement"
+                 ):
         """
         Aging Clock based on Gated (Elastic Net) Multi-head Attention Neural Network
 
@@ -92,9 +93,6 @@ class GatedMultiheadAttentionAgeClock:
         :param predict_batch_iter_max: early stop of batch iteration when reaching this number of batches for the prediction processes, not used if None
         :param initial_model: default None. Load the trained model as the initial model.
         :param balanced_dataloader_parameters: dictionary for h5ad_dataloader BalancedH5ADDataLoader
-        :param K_fold_mode: whether to use K_fold mode. Each-fold datasets should be under one folder
-        :param K_fold_train: The K_fold folders under ad_files_path that are used for training
-        :param K_fold_val: The K_fold folder under ad_files_path that are sued for validation
         :param save_checkpoint: whether to save the checkpoints
         :param checkpoint_step: save checkpoint every this number of steps,only works when save_checkpoint is True
         :param checkpoint_outdir: path to the outputs of checkpoint files, only works when save_checkpoint is True
@@ -114,9 +112,7 @@ class GatedMultiheadAttentionAgeClock:
             cat_card_list = [21, 664, 52, 3]
 
         # default value for dataset_folder_dict if it is None
-        if K_fold_mode and (dataset_folder_dict is None):
-            dataset_folder_dict = {"training_validation": "train_val"}
-        elif dataset_folder_dict is None:
+        if dataset_folder_dict is None:
             dataset_folder_dict = {"training": "train", "validation": "val", "testing": "test"}
 
         self.anndata_dir_root = anndata_dir_root
@@ -154,9 +150,6 @@ class GatedMultiheadAttentionAgeClock:
 
         self.cat_feature_importance_method = cat_feature_importance_method
 
-        self.K_fold_train = K_fold_train
-        self.K_fold_val = K_fold_val
-
         ## training loss metrics
         self.epoch_train_loss_list = []
         self.epoch_val_loss_list = []
@@ -165,6 +158,11 @@ class GatedMultiheadAttentionAgeClock:
         self.initial_model = initial_model
         self.log_step = log_step
         self.log_file = log_file
+
+        ## for ablation
+        self.use_attention=use_attention
+        self.use_feature_gate=use_feature_gate
+        self.ablation_mode=ablation_mode
 
 
         self.save_checkpoint = save_checkpoint
@@ -195,9 +193,7 @@ class GatedMultiheadAttentionAgeClock:
                                           loader_method=self.loader_method,
                                           dataset_folder_dict=self.dataset_folder_dict,
                                           balanced_dataloader_parameters=self.balanced_dataloader_parameters,
-                                          K_fold_mode=K_fold_mode,
-                                          K_fold_train=K_fold_train,
-                                          K_fold_val=K_fold_val
+                                          K_fold_mode=False,
                                           )
 
 
@@ -211,7 +207,7 @@ class GatedMultiheadAttentionAgeClock:
 
 
         # Initialize the model, loss function, and optimizer
-        self.model = GatedMultiheadAttentionFCNet(cat_cardinalities=self.cat_card_list,
+        self.model = AblationGatedMultiheadAttentionFCNet(cat_cardinalities=self.cat_card_list,
                                                   num_numeric_features= feature_size-len(self.cat_card_list),
                                                   n_embed=self.n_embed,
                                                   prediction_hidden_sizes=self.prediction_hidden_sizes,
@@ -219,7 +215,10 @@ class GatedMultiheadAttentionAgeClock:
                                                   l1_lambda=self.l1_lambda,
                                                   l2_lambda=self.l2_lambda,
                                                   num_heads=self.num_heads,
-                                                  cat_feature_importance_method=self.cat_feature_importance_method).to(self.device)
+                                                  cat_feature_importance_method=self.cat_feature_importance_method,
+                                                  use_attention=self.use_attention,
+                                                  use_feature_gate=self.use_feature_gate,
+                                                  ablation_mode=self.ablation_mode).to(self.device)
 
         if self.initial_model:
             self.model.load_state_dict(torch.load(self.initial_model))
@@ -306,7 +305,10 @@ class GatedMultiheadAttentionAgeClock:
                 targets = targets.squeeze()
                 targets = targets.to(torch.float32)
                 outputs = outputs.squeeze()
-                loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
+                if self.use_feature_gate:
+                    loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
+                else:
+                    loss = self.criterion(outputs, targets)
                 loss.backward()
                 self.optimizer.step()
                 all_batch_train_loss_list.append(loss.item())
@@ -342,7 +344,11 @@ class GatedMultiheadAttentionAgeClock:
                         outputs = outputs.squeeze()
                         targets = targets.squeeze()
                         targets = targets.to(torch.float32)
-                        loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
+                        if self.use_feature_gate:
+                            loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
+                        else:
+                            loss = self.criterion(outputs, targets)
+
                         all_batch_val_loss_list.append(loss.item())
                         total_val_loss += loss.item() * inputs.size(0)
                         if iter_num % self.log_step == 1:
@@ -437,7 +443,10 @@ class GatedMultiheadAttentionAgeClock:
                 outputs = outputs.squeeze()
                 targets = targets.squeeze()
                 targets = targets.to(torch.float32)
-                loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
+                if self.use_feature_gate:
+                    loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
+                else:
+                    loss = self.criterion(outputs, targets)
                 total_loss += loss.item() * inputs.size(0)
                 predictions.extend(outputs.cpu().numpy())
                 targets_all.extend(targets.cpu().numpy())
@@ -457,26 +466,34 @@ class GatedMultiheadAttentionAgeClock:
         return self.model.get_feature_importance()
 
 
-class GatedMultiheadAttentionFCNet(nn.Module):
+class AblationGatedMultiheadAttentionFCNet(nn.Module):
+
     def __init__(self,
-                 cat_cardinalities,
-                 num_numeric_features,
-                 n_embed=4,
-                 projection_dim=512, # should match with the header number
-                 prediction_hidden_sizes: list[int] | None = None,
-                 l1_lambda=0.1,
-                 l2_lambda=0.1,
-                 num_heads=8,
-                 dropout_prob=0.2,
-                 cat_feature_importance_method: str = "max",  # max, mean, sum
+                 cat_cardinalities: List[int],
+                 num_numeric_features: int,
+                 n_embed: int = 4,
+                 projection_dim: int = 512,
+                 prediction_hidden_sizes: Optional[List[int]] = None,
+                 l1_lambda: float = 0.1,
+                 l2_lambda: float = 0.1,
+                 num_heads: int = 8,
+                 dropout_prob: float = 0.2,
+                 cat_feature_importance_method: str = "max",
+                 use_feature_gate: bool = True,  # Ablation control for FeatureGate
+                 use_attention: bool = True,  # Ablation control for MultiheadAttention
+                 ablation_mode: str = "complete",  # "complete", "replacement"
                  ):
         super().__init__()
 
+        # Store ablation configuration
+        self.use_feature_gate = use_feature_gate
+        self.use_attention = use_attention
+        self.ablation_mode = ablation_mode
+
         if prediction_hidden_sizes is None:
-            prediction_hidden_sizes = [256,128]
+            prediction_hidden_sizes = [256, 128]
 
         self.n_cats = len(cat_cardinalities)
-
         self.embed_dim_total = self.n_cats * n_embed
         self.cat_feature_importance_method = cat_feature_importance_method
 
@@ -484,25 +501,60 @@ class GatedMultiheadAttentionFCNet(nn.Module):
         self.embeddings = nn.ModuleList([
             nn.Embedding(num_categories, n_embed) for num_categories in cat_cardinalities
         ])
+
         # Input size to first hidden layer: embeddings + numeric features
         input_size = len(cat_cardinalities) * n_embed + num_numeric_features
+        self.input_size = input_size
 
+        # ========== FEATURE GATE ==========
+        if use_feature_gate:
+            self.feature_gate = FeatureGate(input_size,
+                                            l1_lambda=l1_lambda,
+                                            l2_lambda=l2_lambda)
+        elif ablation_mode == "replacement":
+            # Replacement ablation: Use simpler alternative (dense layer)
+            self.feature_gate_replacement = nn.Sequential(
+                nn.Linear(input_size, input_size),
+                nn.ReLU(),
+                nn.Dropout(dropout_prob * 0.5)
+            )
+            self.feature_gate = None
+        else:
+            # Complete removal: Identity mapping
+            self.feature_gate = None
 
-        self.feature_gate = FeatureGate(input_size,
-                                        l1_lambda=l1_lambda,
-                                        l2_lambda=l2_lambda)
+        # ========== PROJECTION LAYER (Always present) ==========
         self.projection_layer = nn.Linear(input_size, projection_dim)
 
-        # Multihead attention
-        self.attention = MultiheadAttention(projection_dim, num_heads)
+        # ==========  MULTIHEAD ATTENTION ==========
+        if use_attention:
+            self.attention = MultiheadAttention(projection_dim, num_heads)
+        elif ablation_mode == "replacement":
+            # Replacement: Use alternative aggregation (e.g., mean pooling)
+            self.attention = None
+            self.attention_replacement = nn.Sequential(
+                nn.Linear(projection_dim, projection_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout_prob)
+            )
+        else:
+            # Complete removal
+            self.attention = None
 
-        ## prediction layer
+        # Optional bridge layer for shape consistency if attention is removed
+        # (Attention usually preserves shape, but we include this for safety)
+        # self.post_attention_projection = nn.Linear(projection_dim, projection_dim)
+
+        # ========== NORMALIZATION ==========
+        self.norm = nn.LayerNorm(projection_dim)
+
+        # ========== PREDICTION HEAD ==========
         hidden_layers_p = nn.ModuleList()
         for i in range(1, len(prediction_hidden_sizes)):
             hidden_layers_p.append(nn.Sequential(
                 nn.Linear(prediction_hidden_sizes[i - 1], prediction_hidden_sizes[i]),
-                nn.ReLU(),  # Activation for each hidden layer
-                nn.Dropout(dropout_prob)  # Dropout for each hidden layer
+                nn.ReLU(),
+                nn.Dropout(dropout_prob)
             ))
 
         self.predict_layer = nn.Sequential(
@@ -512,104 +564,130 @@ class GatedMultiheadAttentionFCNet(nn.Module):
             *hidden_layers_p,
             nn.Linear(prediction_hidden_sizes[-1], 1)
         )
-        self.norm = nn.LayerNorm(projection_dim)  # Normalization for stability
 
-    def forward(self, x):
-        x_cat = x[:, :len(self.embeddings)].long()  # First 4 columns: categorical
-        x_num = x[:, len(self.embeddings):]         # Rest: numeric
+        # Store attention weights for visualization (if attention is used)
+        self.attention_weights = None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        # ========== EMBEDDING CATEGORICAL FEATURES ==========
+        x_cat = x[:, :self.n_cats].long()
+        x_num = x[:, self.n_cats:]
 
         # Embed each categorical feature
         embedded = [emb(x_cat[:, i]) for i, emb in enumerate(self.embeddings)]
-        x_embed = torch.cat(embedded, dim=1)  # Shape: (batch_size, 4 * n_embed)
+        x_embed = torch.cat(embedded, dim=1)
 
         # Combine embedded categorical and numeric features
         x_combined = torch.cat([x_embed, x_num], dim=1)
 
-        x_combined = self.feature_gate(x_combined)  # Feature selection
-        x_combined = self.projection_layer(x_combined)  # Dimensionality reduction
-        x_combined = self.norm(x_combined)  # Normalize features
-        x_combined = self.attention(x_combined.unsqueeze(1)).squeeze(1)  # Attention module
-        return self.predict_layer(x_combined)  # Regression output
+        # ========== FEATURE GATE OR REPLACEMENT ==========
+        if self.use_feature_gate:
+            x_combined = self.feature_gate(x_combined)
+        elif hasattr(self, 'feature_gate_replacement') and self.ablation_mode == "replacement":
+            x_combined = self.feature_gate_replacement(x_combined)
+        # else: pass through unchanged
 
-    def get_feature_importance(self):
-        with torch.no_grad():
-            weight_abs = self.feature_gate.weights.detach().abs().cpu()
+        # ========== PROJECTION ==========
+        x_combined = self.projection_layer(x_combined)
+        x_combined = self.norm(x_combined)
 
-            # Categorical part
-            cat_importance = []
-            for i in range(self.n_cats):
-                start = i * self.embeddings[i].embedding_dim
-                end = start + self.embeddings[i].embedding_dim
-                if self.cat_feature_importance_method == "sum":
-                    score = weight_abs[start:end].sum()
-                elif self.cat_feature_importance_method == "max":
-                    score = weight_abs[start:end].max()
-                elif self.cat_feature_importance_method == "mean":
-                    score = weight_abs[start:end].mean()
-                else:
-                    raise ValueError(f"{self.cat_feature_importance_method} is not in ['sum', 'max','mean']")
-                cat_importance.append(score.item())
+        # ==========  ATTENTION OR REPLACEMENT ==========
+        if self.use_attention:
+            # Apply attention (requires 3D input: batch, seq_len, features)
+            att_output, attn_weights = self.attention(x_combined.unsqueeze(1))
+            x_combined = att_output.squeeze(1)
+            self.attention_weights = attn_weights.detach() if attn_weights is not None else None
+        elif hasattr(self, 'attention_replacement') and self.ablation_mode == "replacement":
+            # Use replacement (replace with a simple transformation)
+            x_combined = self.attention_replacement(x_combined)
+        # else: pass through unchanged
 
-            # Numeric part
-            start_num = self.embed_dim_total
-            num_importance = weight_abs[start_num:].tolist()
+        # Optional post-attention projection for shape consistency
+        # x_combined = self.post_attention_projection(x_combined)
 
-        return cat_importance + num_importance
+        # ========== PREDICTION ==========
+        output = self.predict_layer(x_combined)
 
-    def get_feature_importance_full(self):
-        with torch.no_grad():
-            weight_abs = self.feature_gate.weights.detach().abs().cpu()
+        return output
 
-            # Categorical part
-            cat_importance = []
-            for i in range(self.n_cats):
-                start = i * self.embeddings[i].embedding_dim
-                end = start + self.embeddings[i].embedding_dim
-                if self.cat_feature_importance_method == "sum":
-                    score = weight_abs[start:end].sum()
-                elif self.cat_feature_importance_method == "max":
-                    score = weight_abs[start:end].max()
-                elif self.cat_feature_importance_method == "mean":
-                    score = weight_abs[start:end].mean()
-                else:
-                    raise ValueError(f"{self.cat_feature_importance_method} is not in ['sum', 'max','mean']")
-                cat_importance.append(score.item())
+    def get_regularization_loss(self) -> torch.Tensor:
+        """Get regularization loss from FeatureGate if it exists."""
+        if self.use_feature_gate and hasattr(self, 'feature_gate'):
+            return self.feature_gate.loss()
+        return torch.tensor(0.0, device=next(self.parameters()).device)
 
-            # Numeric part
-            start_num = self.embed_dim_total
-            num_importance = weight_abs[start_num:].tolist()
+    def get_feature_importance(self) -> List[float]:
+        if self.use_feature_gate and hasattr(self, 'feature_gate'):
+            with torch.no_grad():
+                weight_abs = self.feature_gate.weights.detach().abs().cpu()
 
-        return cat_importance, num_importance, weight_abs.numpy()
+                # Categorical part
+                cat_importance = []
+                for i in range(self.n_cats):
+                    start = i * self.embeddings[i].embedding_dim
+                    end = start + self.embeddings[i].embedding_dim
+                    if self.cat_feature_importance_method == "sum":
+                        score = weight_abs[start:end].sum()
+                    elif self.cat_feature_importance_method == "max":
+                        score = weight_abs[start:end].max()
+                    elif self.cat_feature_importance_method == "mean":
+                        score = weight_abs[start:end].mean()
+                    else:
+                        raise ValueError(f"Unknown method: {self.cat_feature_importance_method}")
+                    cat_importance.append(score.item())
 
-"""
-Pure L1: Set l2_lambda=0.
-Pure L2: Set l1_lambda=0. ## not suggested for sparse feature selection
-Elastic: Set both l1_lambda and l2_lambda to positive values.
-"""
+                # Numeric part
+                start_num = self.embed_dim_total
+                num_importance = weight_abs[start_num:].tolist()
+
+            return cat_importance + num_importance
+        else:
+            # When feature gate is not used, return uniform importance
+            total_features = self.input_size
+            return [1.0 / total_features] * total_features
+
+    def get_model_config(self) -> Dict:
+        """Get model configuration for experiment tracking."""
+        return {
+            "use_feature_gate": self.use_feature_gate,
+            "use_attention": self.use_attention,
+            "ablation_mode": self.ablation_mode,
+            "n_cats": self.n_cats,
+            "input_size": self.input_size,
+            "projection_dim": self.projection_layer.out_features,
+            "num_params": sum(p.numel() for p in self.parameters())
+        }
+
+
 class FeatureGate(nn.Module):
-    def __init__(self, input_dim, l1_lambda=0.1, l2_lambda=0.1):
+    def __init__(self, input_dim: int, l1_lambda: float = 0.1, l2_lambda: float = 0.1):
         super().__init__()
         self.weights = nn.Parameter(torch.ones(input_dim, requires_grad=True))
-        self.l1_lambda = l1_lambda  # L1 regularization strength
-        self.l2_lambda = l2_lambda  # L2 regularization strength
+        self.l1_lambda = l1_lambda
+        self.l2_lambda = l2_lambda
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x * self.weights
 
-    def loss(self):
-        # L1 regularization term
+    def loss(self) -> torch.Tensor:
         l1_loss = self.l1_lambda * torch.norm(self.weights, p=1)
-        # L2 regularization term
         l2_loss = self.l2_lambda * torch.norm(self.weights, p=2)
-        # Total loss combines both terms (elastic regularization if both are non-zero)
         return l1_loss + l2_loss
 
-class MultiheadAttention(nn.Module):
-    def __init__(self, embed_dim, num_heads):
-        super().__init__()
-        self.attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
-        self.attn_weights = None  # Store attention weights
 
-    def forward(self, x):
-        x, attn_weights = self.attn(x, x, x)  # Compute attention
-        return x
+class MultiheadAttention(nn.Module):
+    def __init__(self, embed_dim: int, num_heads: int):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            batch_first=True,
+            dropout=0.1  # Optional dropout within attention
+        )
+        self.attn_weights = None
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        output, attn_weights = self.attn(x, x, x)
+        self.attn_weights = attn_weights
+        return output, attn_weights
