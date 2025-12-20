@@ -51,6 +51,7 @@ class GatedMultiheadAttentionAgeClockAblation:
                  checkpoint_file_prefix: str = "GMA",
                  log_step: int = 100,
                  log_file: str = "log.txt",
+                 use_cat_embeddings: bool = True,
                  use_feature_gate: bool = True,  # Ablation control for FeatureGate
                  use_attention: bool = True,  # Ablation control for MultiheadAttention
                  ablation_mode: str = "complete",  # "complete", "replacement"
@@ -160,6 +161,7 @@ class GatedMultiheadAttentionAgeClockAblation:
         self.log_file = log_file
 
         ## for ablation
+        self.use_cat_embeddings = use_cat_embeddings
         self.use_attention=use_attention
         self.use_feature_gate=use_feature_gate
         self.ablation_mode=ablation_mode
@@ -216,6 +218,7 @@ class GatedMultiheadAttentionAgeClockAblation:
                                                   l2_lambda=self.l2_lambda,
                                                   num_heads=self.num_heads,
                                                   cat_feature_importance_method=self.cat_feature_importance_method,
+                                                  use_cat_embeddings=self.use_cat_embeddings,
                                                   use_attention=self.use_attention,
                                                   use_feature_gate=self.use_feature_gate,
                                                   ablation_mode=self.ablation_mode).to(self.device)
@@ -479,6 +482,7 @@ class AblationGatedMultiheadAttentionFCNet(nn.Module):
                  num_heads: int = 8,
                  dropout_prob: float = 0.2,
                  cat_feature_importance_method: str = "max",
+                 use_cat_embeddings: bool = True,
                  use_feature_gate: bool = True,  # Ablation control for FeatureGate
                  use_attention: bool = True,  # Ablation control for MultiheadAttention
                  ablation_mode: str = "complete",  # "complete", "replacement"
@@ -486,6 +490,7 @@ class AblationGatedMultiheadAttentionFCNet(nn.Module):
         super().__init__()
 
         # Store ablation configuration
+        self.use_cat_embeddings = use_cat_embeddings
         self.use_feature_gate = use_feature_gate
         self.use_attention = use_attention
         self.ablation_mode = ablation_mode
@@ -493,17 +498,20 @@ class AblationGatedMultiheadAttentionFCNet(nn.Module):
         if prediction_hidden_sizes is None:
             prediction_hidden_sizes = [256, 128]
 
-        self.n_cats = len(cat_cardinalities)
-        self.embed_dim_total = self.n_cats * n_embed
         self.cat_feature_importance_method = cat_feature_importance_method
 
-        # Embedding layers for categorical inputs
-        self.embeddings = nn.ModuleList([
-            nn.Embedding(num_categories, n_embed) for num_categories in cat_cardinalities
-        ])
-
         # Input size to first hidden layer: embeddings + numeric features
-        input_size = len(cat_cardinalities) * n_embed + num_numeric_features
+        if self.use_cat_embeddings:
+            self.n_cats = len(cat_cardinalities)
+            self.embed_dim_total = self.n_cats * n_embed
+            # Embedding layers for categorical inputs
+            self.embeddings = nn.ModuleList([
+                nn.Embedding(num_categories, n_embed) for num_categories in cat_cardinalities
+            ])
+            input_size = len(cat_cardinalities) * n_embed + num_numeric_features
+        else:
+            input_size = len(cat_cardinalities) + num_numeric_features
+
         self.input_size = input_size
 
         # ========== FEATURE GATE ==========
@@ -571,15 +579,18 @@ class AblationGatedMultiheadAttentionFCNet(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
 
         # ========== EMBEDDING CATEGORICAL FEATURES ==========
-        x_cat = x[:, :self.n_cats].long()
-        x_num = x[:, self.n_cats:]
+        if self.use_cat_embeddings:
+            x_cat = x[:, :self.n_cats].long()
+            x_num = x[:, self.n_cats:]
 
-        # Embed each categorical feature
-        embedded = [emb(x_cat[:, i]) for i, emb in enumerate(self.embeddings)]
-        x_embed = torch.cat(embedded, dim=1)
+            # Embed each categorical feature
+            embedded = [emb(x_cat[:, i]) for i, emb in enumerate(self.embeddings)]
+            x_embed = torch.cat(embedded, dim=1)
 
-        # Combine embedded categorical and numeric features
-        x_combined = torch.cat([x_embed, x_num], dim=1)
+            # Combine embedded categorical and numeric features
+            x_combined = torch.cat([x_embed, x_num], dim=1)
+        else:
+            x_combined = x
 
         # ========== FEATURE GATE OR REPLACEMENT ==========
         if self.use_feature_gate:
@@ -594,7 +605,6 @@ class AblationGatedMultiheadAttentionFCNet(nn.Module):
 
         # ==========  ATTENTION OR REPLACEMENT ==========
         if self.use_attention:
-            # Apply attention (requires 3D input: batch, seq_len, features)
             att_output, attn_weights = self.attention(x_combined.unsqueeze(1))
             x_combined = att_output.squeeze(1)
             self.attention_weights = attn_weights.detach() if attn_weights is not None else None
