@@ -19,6 +19,7 @@ from .model.CatBoost import CatBoostAgeClock
 from .model.Linear import TorchElasticNetAgeClock
 from .model.MLP import MLPAgeClock
 from .model.XGBoost import XGBoostAgeClock
+from .model.autoencoder import AutoencoderAgeClock
 
 
 # pipeline for model training
@@ -212,6 +213,28 @@ def training_pipeline(model_name: str = "GMA",
                                             **kwargs)
     elif model_name == "MLP":
         age_clock = MLPAgeClock(anndata_dir_root=ad_dir_root,
+                                dataset_folder_dict=dataset_folder_dict,
+                                predict_dataset=predict_dataset,
+                                validation_during_training=validation_during_training,
+                                feature_size=feature_size,
+                                batch_size_train=batch_size_train,
+                                train_batch_iter_max=train_batch_iter_max,
+                                batch_size_val=batch_size_val,
+                                batch_size_test=batch_size_test,
+                                predict_batch_iter_max=predict_batch_iter_max,
+                                epochs=epochs,
+                                loader_method=loader_method,
+                                num_workers=num_workers,
+                                device=device,
+                                log_file=log_file,
+                                learning_rate=learning_rate,
+                                weight_decay=nn_weight_decay,
+                                K_fold_mode=K_fold_mode,
+                                K_fold_train=K_fold_train,
+                                K_fold_val=K_fold_val,
+                                **kwargs)
+    elif model_name == "Autoencoder":
+        age_clock = AutoencoderAgeClock(anndata_dir_root=ad_dir_root,
                                 dataset_folder_dict=dataset_folder_dict,
                                 predict_dataset=predict_dataset,
                                 validation_during_training=validation_during_training,
@@ -498,7 +521,7 @@ def load_GMA_model(model_file,
         raise ValueError(f"{model_file_type} not supported")
 
 def list_available_models(print_model_name=True):
-    available_models = ["linear", "xgboost", "catboost", "MLP", "GMA"]
+    available_models = ["linear", "xgboost", "catboost", "MLP", "GMA","Autoencoder"]
     if print_model_name:
         print(available_models)
 
