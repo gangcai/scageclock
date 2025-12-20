@@ -1,5 +1,3 @@
-import torch
-import torch.nn as nn
 import torch.optim as optim
 from typing import List, Optional
 from ..utility import get_validation_metrics
@@ -8,8 +6,13 @@ import time
 import logging
 import numpy as np
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
 ## Aging Clock based on multilayer perceptron (MLP)
-class MLPAgeClock:
+class AutoencoderAgeClock:
     def __init__(self,
                  anndata_dir_root: str,
                  dataset_folder_dict: dict | None = None,
@@ -28,7 +31,7 @@ class MLPAgeClock:
                  age_column: str = "age",
                  cell_id: str = "soma_joinid",
                  loader_method: str = "scageclock",
-                 hidden_sizes: Optional[List[int]] = None,
+                 encoder_hidden: Optional[List[int]] = None,
                  output_size: int = 1,
                  dropout_prob: float = 0.2,
                  learning_rate: float = 0.001,
@@ -43,14 +46,17 @@ class MLPAgeClock:
                  K_fold_val: str = "Fold5",
                  device: str = "cpu",
                  log_step: int = 100,
-                 log_file: str = "MLPAgeClock_log.txt"):
+                 log_file: str = "MLPAgeClock_log.txt",
+                 AE_regressor_type: str = "simple",
+                 recon_lambda=0.1,
+                 **kwargs):
         if cat_card_list is None:
             # ['assay', 'cell_type', 'tissue_general', 'sex'],
             # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
             # cat_card_list = [14, 219, 39, 3]
             cat_card_list = [21, 664, 52, 3]
-        if hidden_sizes is None:
-            hidden_sizes = [512, 256, 128]  # setting default values for hidden sizes
+        if encoder_hidden is None:
+            encoder_hidden = [512, 256, 128]  # setting default values for hidden sizes
 
         # default value for dataset_folder_dict if it is None
         if K_fold_mode and (dataset_folder_dict is None):
@@ -75,7 +81,7 @@ class MLPAgeClock:
         self.age_column = age_column
         self.cell_id = cell_id
         self.loader_method = loader_method
-        self.hidden_sizes = hidden_sizes
+        self.encoder_hidden = encoder_hidden
         self.output_size = output_size
         self.dropout_prob = dropout_prob
         self.learning_rate = learning_rate
@@ -95,10 +101,14 @@ class MLPAgeClock:
 
         self.log_step = log_step
         self.log_file = log_file
+
+        self.AE_regressor_type = AE_regressor_type
+        self.recon_lambda = recon_lambda
         # Configure logging
         logging.basicConfig(filename=self.log_file, level=logging.INFO)
 
         ## loading the data
+
         self.dataloader = BasicDataLoader(anndata_dir_root=self.anndata_dir_root,
                                           var_file_name=self.var_file_name,
                                           var_colname=self.var_colname,
@@ -125,11 +135,21 @@ class MLPAgeClock:
                 raise ValueError("validation datasets is not provided!")
 
         # Initialize the model, loss function, and optimizer
-        self.model = MLP(cat_cardinalities=self.cat_card_list,
-                         num_numeric_features=feature_size - len(self.cat_card_list),
-                         n_embed=self.n_embed,
-                         hidden_sizes=self.hidden_sizes,
-                         dropout_prob=self.dropout_prob).to(self.device)
+        if self.AE_regressor_type == "simple":
+            self.model = AE_Simple_AgePredictor(cat_cardinalities=self.cat_card_list,
+                                                num_numeric_features=feature_size - len(self.cat_card_list),
+                                                n_embed=self.n_embed,
+                                                encoder_hidden=self.encoder_hidden,
+                                                dropout_prob=self.dropout_prob).to(self.device)
+        elif self.AE_regressor_type == "MLP":
+            self.model = AE_MLP_AgePredictor(cat_cardinalities=self.cat_card_list,
+                                             num_numeric_features=feature_size - len(self.cat_card_list),
+                                             n_embed=self.n_embed,
+                                             encoder_hidden=self.encoder_hidden,
+                                             dropout_prob=self.dropout_prob,
+                                             **kwargs).to(self.device)
+        else:
+            raise ValueError("Invalid AE_regressor_type!, only simple or MLP are supported!")
 
 
         self.criterion = nn.MSELoss()  # Mean squared error for regression
@@ -212,13 +232,18 @@ class MLPAgeClock:
                 targets, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
                 self.optimizer.zero_grad()
                 inputs = inputs.to(self.device)
-                outputs = self.model(inputs)
+                outputs,x_recon, _ = self.model(inputs)
                 targets = targets.to(self.device)
 
                 targets = targets.squeeze()
                 targets = targets.to(torch.float32)
                 outputs = outputs.squeeze()
-                loss = self.criterion(outputs, targets)
+                ## prediction loss + reconstruction loss
+                predition_loss = self.criterion(outputs, targets)
+                #recon_loss = F.mse_loss(x_recon, inputs)
+                #exclude the categorical feature for reconstruction
+                recon_loss = F.mse_loss(x_recon[:,16:], inputs[:,4:])
+                loss = predition_loss + self.recon_lambda*recon_loss
                 loss.backward()
                 self.optimizer.step()
                 all_batch_train_loss_list.append(loss.item())
@@ -234,13 +259,19 @@ class MLPAgeClock:
                     self.model.eval() ## re-set to eval
                     with torch.no_grad():
                         targets = self.val_y_batch
-                        inputs = inputs.to(self.device)
-                        outputs = self.model(self.val_X_batch)
+                        #inputs = inputs.to(self.device)
+
+                        outputs,x_recon, _ = self.model(self.val_X_batch)
                         targets = targets.to(self.device)
                         outputs = outputs.squeeze()
                         targets = targets.squeeze()
                         targets = targets.to(torch.float32)
-                        loss = self.criterion(outputs, targets)
+                        predition_loss = self.criterion(outputs, targets)
+                        # recon_loss = F.mse_loss(x_recon, inputs)
+                        # exclude the categorical feature for reconstruction
+                        recon_loss = F.mse_loss(x_recon[:, 16:], self.val_X_batch[:, 4:])
+                        loss = predition_loss + self.recon_lambda*recon_loss
+
                         all_batch_val_loss_list.append(loss.item())
                         total_val_loss += loss.item() * inputs.size(0)
                         if iter_num % self.log_step == 1:
@@ -315,11 +346,16 @@ class MLPAgeClock:
             for inputs, labels_soma in predict_dataloader:
                 targets, soma_ids = torch.split(labels_soma, split_size_or_sections=1, dim=1)
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
-                outputs = self.model(inputs)
+                outputs,x_recon, _ = self.model(inputs)
                 outputs = outputs.squeeze()
                 targets = targets.squeeze()
                 targets = targets.to(torch.float32)
-                loss = self.criterion(outputs, targets)
+                predition_loss = self.criterion(outputs, targets)
+                # recon_loss = F.mse_loss(x_recon, inputs)
+                # exclude the categorical feature for reconstruction
+                recon_loss = F.mse_loss(x_recon[:, 16:], inputs[:, 4:])
+                loss = predition_loss + self.recon_lambda * recon_loss
+
                 total_loss += loss.item() * inputs.size(0)
                 predictions.extend(outputs.cpu().numpy())
                 targets_all.extend(targets.cpu().numpy())
@@ -335,69 +371,232 @@ class MLPAgeClock:
         return predictions, targets_all, soma_ids_all, avg_loss
 
 
-## MLP model for aging prediction
-class MLP(nn.Module):
-    def __init__(self,
-                 cat_cardinalities,
-                 num_numeric_features,
-                 n_embed=4,
-                 hidden_sizes=[512, 256, 128],
-                 output_size=1,
-                 dropout_prob=0.2,
-                 cat_feature_importance_method: str = "max",):
-        super(MLP, self).__init__()
+class Encoder(nn.Module):
+    def __init__(
+        self,
+        input_size,
+        hidden_sizes=[512, 256],
+        latent_dim=64,
+        dropout_prob=0.2
+    ):
+        super().__init__()
+
+        layers = []
+        for i in range(len(hidden_sizes)):
+            in_dim = input_size if i == 0 else hidden_sizes[i - 1]
+            layers.extend([
+                nn.Linear(in_dim, hidden_sizes[i]),
+                nn.ReLU(),
+                nn.Dropout(dropout_prob)
+            ])
+
+        self.encoder = nn.Sequential(*layers)
+        self.latent_layer = nn.Linear(hidden_sizes[-1], latent_dim)
+
+    def forward(self, x):
+        h = self.encoder(x)
+        z = self.latent_layer(h)
+        return z
+
+class Decoder(nn.Module):
+    def __init__(
+        self,
+        latent_dim,
+        hidden_sizes=[256, 512],
+        output_size=None,
+        dropout_prob=0.2
+    ):
+        super().__init__()
+
+        layers = []
+        for i in range(len(hidden_sizes)):
+            in_dim = latent_dim if i == 0 else hidden_sizes[i - 1]
+            layers.extend([
+                nn.Linear(in_dim, hidden_sizes[i]),
+                nn.ReLU(),
+                nn.Dropout(dropout_prob)
+            ])
+
+        self.decoder = nn.Sequential(*layers)
+        self.output_layer = nn.Linear(hidden_sizes[-1], output_size)
+
+    def forward(self, z):
+        h = self.decoder(z)
+        x_recon = self.output_layer(h)
+        return x_recon
+
+class LatentRegressor_MLP(nn.Module):
+    def __init__(
+        self,
+        latent_dim,
+        hidden_sizes=[128, 64],
+        dropout_prob=0.2,
+        output_size=1
+    ):
+        super().__init__()
+
+        layers = []
+        for i in range(len(hidden_sizes)):
+            in_dim = latent_dim if i == 0 else hidden_sizes[i - 1]
+            layers.extend([
+                nn.Linear(in_dim, hidden_sizes[i]),
+                nn.ReLU(),
+                nn.Dropout(dropout_prob)
+            ])
+
+        self.mlp = nn.Sequential(*layers)
+        self.output_layer = nn.Linear(hidden_sizes[-1], output_size)
+
+    def forward(self, z):
+        h = self.mlp(z)
+        return self.output_layer(h)
+
+class LatentRegressor_simple(nn.Module):
+    def __init__(
+        self,
+        latent_dim,
+        output_size=1
+    ):
+        super().__init__()
+        self.output_layer = nn.Linear(latent_dim, output_size)
+
+    def forward(self, z):
+        return self.output_layer(z)
+
+class AE_MLP_AgePredictor(nn.Module):
+    def __init__(
+        self,
+        cat_cardinalities,
+        num_numeric_features,
+        n_embed=4,
+        encoder_hidden=[512, 256],
+        latent_dim=64,
+        regressor_hidden=[128, 64],
+        dropout_prob=0.2
+    ):
+        super().__init__()
 
         self.n_cats = len(cat_cardinalities)
 
-        self.embed_dim_total = self.n_cats * n_embed
-        self.cat_feature_importance_method = cat_feature_importance_method
-
-        # Embedding layers for categorical inputs
+        # Embeddings
         self.embeddings = nn.ModuleList([
-            nn.Embedding(num_categories, n_embed) for num_categories in cat_cardinalities
+            nn.Embedding(cardinality, n_embed)
+            for cardinality in cat_cardinalities
         ])
-        # Input size to first hidden layer: embeddings + numeric features
-        input_size = len(cat_cardinalities) * n_embed + num_numeric_features
 
-        # Input layer
-        self.input_layer = nn.Linear(input_size, hidden_sizes[0])
-        self.dropout1 = nn.Dropout(dropout_prob)
-        self.activation = nn.ReLU()  # Define activation explicitly for reuse
+        input_size = self.n_cats * n_embed + num_numeric_features
 
-        # Hidden layers
-        self.hidden_layers = nn.ModuleList()
-        for i in range(1, len(hidden_sizes)):
-            self.hidden_layers.append(nn.Sequential(
-                nn.Linear(hidden_sizes[i - 1], hidden_sizes[i]),
-                nn.ReLU(),  # Activation for each hidden layer
-                nn.Dropout(dropout_prob)  # Dropout for each hidden layer
-            ))
+        # Autoencoder
+        self.encoder = Encoder(
+            input_size=input_size,
+            hidden_sizes=encoder_hidden,
+            latent_dim=latent_dim,
+            dropout_prob=dropout_prob
+        )
 
-        # Output layer
-        self.output_layer = nn.Linear(hidden_sizes[-1], output_size)
+        self.decoder = Decoder(
+            latent_dim=latent_dim,
+            hidden_sizes=encoder_hidden[::-1],
+            output_size=input_size,
+            dropout_prob=dropout_prob
+        )
+
+        # Regressor
+        self.regressor = LatentRegressor_MLP(
+            latent_dim=latent_dim,
+            hidden_sizes=regressor_hidden,
+            dropout_prob=dropout_prob
+        )
 
     def forward(self, x):
+        # Split inputs
+        x_cat = x[:, :self.n_cats].long()
+        x_num = x[:, self.n_cats:]
 
-        x_cat = x[:, :len(self.embeddings)].long()  # First 4 columns: categorical
-        x_num = x[:, len(self.embeddings):]         # Rest: numeric
+        # Embed categorical features
+        x_embed = torch.cat(
+            [emb(x_cat[:, i]) for i, emb in enumerate(self.embeddings)],
+            dim=1
+        )
 
-        # Embed each categorical feature
-        embedded = [emb(x_cat[:, i]) for i, emb in enumerate(self.embeddings)]
-        x_embed = torch.cat(embedded, dim=1)  # Shape: (batch_size, 4 * n_embed)
-
-        # Combine embedded categorical and numeric features
         x_combined = torch.cat([x_embed, x_num], dim=1)
 
-        # Input layer + activation + dropout
-        x_combined = self.activation(self.input_layer(x_combined))
-        x_combined = self.dropout1(x_combined)
+        # Encode
+        z = self.encoder(x_combined)
 
-        # Hidden layers (already contain activation + dropout)
-        for layer in self.hidden_layers:
-            x_combined = layer(x_combined)
+        # Decode (for reconstruction loss)
+        x_recon = self.decoder(z)
 
-        # Output layer (no activation or dropout)
-        x_combined = self.output_layer(x_combined)
-        return x_combined
+        # Predict age
+        age_pred = self.regressor(z)
+
+        return age_pred, x_recon, z
+
+
+class AE_Simple_AgePredictor(nn.Module):
+    def __init__(
+        self,
+        cat_cardinalities,
+        num_numeric_features,
+        n_embed=4,
+        encoder_hidden=[512, 256],
+        latent_dim=64,
+        dropout_prob=0.2
+    ):
+        super().__init__()
+
+        self.n_cats = len(cat_cardinalities)
+
+        # Embeddings
+        self.embeddings = nn.ModuleList([
+            nn.Embedding(cardinality, n_embed)
+            for cardinality in cat_cardinalities
+        ])
+
+        input_size = self.n_cats * n_embed + num_numeric_features
+
+        # Autoencoder
+        self.encoder = Encoder(
+            input_size=input_size,
+            hidden_sizes=encoder_hidden,
+            latent_dim=latent_dim,
+            dropout_prob=dropout_prob
+        )
+
+        self.decoder = Decoder(
+            latent_dim=latent_dim,
+            hidden_sizes=encoder_hidden[::-1],
+            output_size=input_size,
+            dropout_prob=dropout_prob
+        )
+
+        # Regressor
+        self.regressor = LatentRegressor_simple(
+            latent_dim=latent_dim,
+        )
+
+    def forward(self, x):
+        # Split inputs
+        x_cat = x[:, :self.n_cats].long()
+        x_num = x[:, self.n_cats:]
+
+        # Embed categorical features
+        x_embed = torch.cat(
+            [emb(x_cat[:, i]) for i, emb in enumerate(self.embeddings)],
+            dim=1
+        )
+
+        x_combined = torch.cat([x_embed, x_num], dim=1)
+
+        # Encode
+        z = self.encoder(x_combined)
+
+        # Decode (for reconstruction loss)
+        x_recon = self.decoder(z)
+
+        # Predict age
+        age_pred = self.regressor(z)
+
+        return age_pred, x_recon, z
 
 
