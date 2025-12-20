@@ -41,6 +41,7 @@ def run_ablation_training_pipeline(
                       loss: str = "MSE",
                       model_save_method: str = "stat_dict",
                       cat_n_embed: int = 4,  ## number of embedding for the categorical feature, only used in eGMA
+                      use_cat_embeddings: bool = True,
                       use_feature_gate: bool = True,  # Ablation control for FeatureGate
                       use_attention: bool = True,  # Ablation control for MultiheadAttention
                       ablation_mode: str = "complete",  # "complete", "replacement"
@@ -94,6 +95,7 @@ def run_ablation_training_pipeline(
                             log_file=log_file,
                             learning_rate=learning_rate,
                             weight_decay=nn_weight_decay,
+                            use_cat_embeddings=use_cat_embeddings,
                             use_feature_gate=use_feature_gate,
                             use_attention=use_attention,
                             ablation_mode=ablation_mode,
