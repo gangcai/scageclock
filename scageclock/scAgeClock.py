@@ -23,11 +23,6 @@ from .model.autoencoder import AutoencoderAgeClock
 
 
 # pipeline for model training
-# TODO: optimize ad_dir_root and meta_file_path default settings
-# /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/select_protein_coding_genes/H5AD_CountsNormalized_ProteinCoding/
-# /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_testdata.parquet
-# /mnt/DB/gangcai/database/public_db/CZCELLxGENE/whole_datasets/CZCELLxGENE_Human_All/normal/metadata/meta_valdata.parquet
-# TODO: change the saving method for xgboost
 def training_pipeline(model_name: str = "GMA",
                       dataset_folder_dict: dict | None = None,
                       feature_size: int = 19238,
