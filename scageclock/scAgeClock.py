@@ -458,7 +458,8 @@ def load_GMA_model(model_file,
                    prediction_hidden_sizes: list[int] | None = None,
                    l1_lambda: float = 0.1,
                    l2_lambda: float = 0.5,
-                   num_heads: int = 8,):
+                   num_heads: int = 8,
+                   dropout_prob: float = 0.2): # dropout used when the monte carlo dropout in prediction is on
     # default cardinalities for each categorical feature column
     if prediction_hidden_sizes is None:
         prediction_hidden_sizes = [256, 128]
@@ -475,7 +476,8 @@ def load_GMA_model(model_file,
                            prediction_hidden_sizes=prediction_hidden_sizes,
                            l1_lambda=l1_lambda,
                            l2_lambda=l2_lambda,
-                           num_heads=num_heads)
+                           num_heads=num_heads,
+                           dropout_prob=dropout_prob)
         if torch.backends.mps.is_available():
             print("Mac mps is found, and device is set to be mps")
             device = 'mps'
@@ -494,7 +496,8 @@ def load_GMA_model(model_file,
                            prediction_hidden_sizes=prediction_hidden_sizes,
                            l1_lambda=l1_lambda,
                            l2_lambda=l2_lambda,
-                           num_heads=num_heads)
+                           num_heads=num_heads,
+                           dropout_prob=dropout_prob)
         if torch.backends.mps.is_available():
             print("Mac mps is found, and device is set to be mps")
             device = 'mps'
