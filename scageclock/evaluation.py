@@ -1,3 +1,7 @@
+import random
+
+from torch.xpu import device
+
 from .scAgeClock import load_GMA_model
 import glob
 import anndata
@@ -9,6 +13,7 @@ from .utility import get_validation_metrics
 import os
 import re
 from .utility import donor_level_test
+from tqdm import tqdm
 
 
 def prediction(model_file: str,
@@ -19,8 +24,28 @@ def prediction(model_file: str,
                age_col: str = "age",  # age column name in adata.obs
                cell_id_col: str = "soma_joinid",
                output_file: str | None = None,
+               cat_cardinalities: list[int] | None = None,
+               num_numeric_features: int = 19234,
+               projection_dim=512,
+               prediction_hidden_sizes: list[int] | None = None,
+               num_heads: int = 8,
                ):
-    model = load_GMA_model(model_file=model_file, model_file_type=model_file_type)
+    # default cardinalities for each categorical feature column
+    if prediction_hidden_sizes is None:
+        prediction_hidden_sizes = [256, 128]
+
+    if cat_cardinalities is None:
+        # ['assay', 'cell_type', 'tissue_general', 'sex'],
+        # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+        cat_cardinalities = [21, 664, 52, 3]
+
+    model = load_GMA_model(model_file=model_file,
+                           model_file_type=model_file_type,
+                           cat_cardinalities=cat_cardinalities,
+                           num_numeric_features=num_numeric_features,
+                           prediction_hidden_sizes=prediction_hidden_sizes,
+                           projection_dim=projection_dim,
+                           num_heads=num_heads,)
     model.eval() # don't miss this, otherwise the prediction will be different
 
 
@@ -56,6 +81,199 @@ def prediction(model_file: str,
             cell_df.to_excel(output_file)
 
     return cell_df
+
+def prediction_with_Monte_Carlo_dropout(model_file: str,
+               model_file_type: str = "pth",
+               h5ad_dir: str | None = None,
+               adata: anndata.AnnData | None = None,
+               ad_file: str | None = None,
+               age_col: str = "age",
+               cell_id_col: str = "soma_joinid",
+               output_file: str | None = None,
+               cat_cardinalities: list[int] | None = None,
+               num_numeric_features: int = 19234,
+               projection_dim=512,
+               prediction_hidden_sizes: list[int] | None = None,
+               l1_lambda: float = 0.1,
+               l2_lambda: float = 0.5,
+               num_heads: int = 8,
+               dropout_prob: float = 0.2,
+               n_mc: int = 50,
+            ):
+    # default cardinalities for each categorical feature column
+    if prediction_hidden_sizes is None:
+        prediction_hidden_sizes = [256, 128]
+
+    if cat_cardinalities is None:
+        # ['assay', 'cell_type', 'tissue_general', 'sex'],
+        # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+        cat_cardinalities = [21, 664, 52, 3]
+
+    model = load_GMA_model(model_file=model_file,
+                           model_file_type=model_file_type,
+                           cat_cardinalities=cat_cardinalities,
+                           num_numeric_features=num_numeric_features,
+                           prediction_hidden_sizes=prediction_hidden_sizes,
+                           projection_dim=projection_dim,
+                           l1_lambda=l1_lambda,
+                           l2_lambda=l2_lambda,
+                           num_heads=num_heads,
+                           dropout_prob=dropout_prob,)
+
+    # Enable dropout at inference
+    model.train()
+
+    # Load AnnData
+    if h5ad_dir is not None:
+        h5ad_files = glob.glob(f"{h5ad_dir}/*.h5ad")
+        ad_list = [sc.read_h5ad(f) for f in h5ad_files]
+        adata = anndata.concat(ad_list)
+    elif ad_file is not None:
+        adata = sc.read_h5ad(ad_file)
+    elif adata is None:
+        raise ValueError("Inputs error")
+
+    # Prepare inputs
+    X_inputs = adata.X.toarray()
+    X_inputs_tensor = torch.from_numpy(X_inputs).to(torch.float32)
+
+    y_true = np.array(adata.obs[age_col])
+    cell_ids = list(adata.obs[cell_id_col])
+
+    dfs = []
+
+    with torch.no_grad():
+        for mc_index in tqdm(range(n_mc), desc="Monte Carlo Dropout"):
+            y_predicted = model(X_inputs_tensor).flatten().cpu().numpy()
+            age_diff = np.array(y_predicted) - np.array(y_true)
+
+            cell_df = pd.DataFrame({
+                "cell_id": cell_ids,
+                "cell_age_true": y_true,
+                "cell_age_predicted": y_predicted,
+                "cell_age_diff": age_diff,
+                "Monte_Carlo_index": mc_index
+            })
+
+            dfs.append(cell_df)
+
+    # Concatenate all MC runs
+    cell_df = pd.concat(dfs, ignore_index=True)
+
+    if output_file is not None:
+        cell_df.to_excel(output_file, index=False)
+
+    return cell_df
+
+
+def prediction_with_Monte_Carlo_dropout_chunks(model_file: str,
+               model_file_type: str = "pth",
+               h5ad_dir: str | None = None,
+               age_col: str = "age",
+               cell_id_col: str = "soma_joinid",
+               output_dir: str = "GMA_Monte_Carlo_Prediction_Out",
+               output_prefix: str = "scageclock_monte_carlo",
+               cat_cardinalities: list[int] | None = None,
+               num_numeric_features: int = 19234,
+               projection_dim=512,
+               prediction_hidden_sizes: list[int] | None = None,
+               l1_lambda: float = 0.1,
+               l2_lambda: float = 0.5,
+               num_heads: int = 8,
+               dropout_prob: float = 0.2,
+               n_mc: int = 50,
+               base_seed: int = 42,
+               mc_index_start: int | None = None,
+            ):
+    # default cardinalities for each categorical feature column
+    if prediction_hidden_sizes is None:
+        prediction_hidden_sizes = [256, 128]
+
+    if cat_cardinalities is None:
+        # ['assay', 'cell_type', 'tissue_general', 'sex'],
+        # the cardinalities for each categorical feature column, the first len(cat_car_list) columns
+        cat_cardinalities = [21, 664, 52, 3]
+
+    model = load_GMA_model(model_file=model_file,
+                           model_file_type=model_file_type,
+                           cat_cardinalities=cat_cardinalities,
+                           num_numeric_features=num_numeric_features,
+                           prediction_hidden_sizes=prediction_hidden_sizes,
+                           projection_dim=projection_dim,
+                           l1_lambda=l1_lambda,
+                           l2_lambda=l2_lambda,
+                           num_heads=num_heads,
+                           dropout_prob=dropout_prob,)
+
+    # Enable dropout at inference
+    model.train()
+
+    # Load AnnData
+    if h5ad_dir is not None:
+        h5ad_files = glob.glob(f"{h5ad_dir}/*.h5ad")
+        # ad_list = [sc.read_h5ad(f) for f in h5ad_files]
+        #adata = anndata.concat(ad_list)
+    else:
+        raise ValueError("Inputs error")
+
+    device = next(model.parameters()).device
+
+    if not os.path.exists(output_dir):
+        print(f"Creating output directory {output_dir}")
+        os.makedirs(output_dir)
+    else:
+        print(f"Output directory {output_dir} already exists")
+
+    with torch.no_grad():
+        for mc_index in tqdm(range(n_mc), desc="Monte Carlo Dropout"):
+
+            if mc_index_start is not None:
+                if mc_index < mc_index_start:
+                    print(f"Skipping mc_index: {mc_index}")
+                    continue
+
+            ## set seed for each Monte Carlo interation, to ensure the same dropout masked neural networks for each chunk file
+            seed = base_seed + mc_index
+            torch.manual_seed(seed)
+
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
+
+            np.random.seed(seed)
+            random.seed(seed)
+            dfs = []
+            for h5ad_file in tqdm(h5ad_files, desc="H5AD Files"):
+                adata = sc.read_h5ad(h5ad_file)
+                # Prepare inputs
+                X_inputs = adata.X.toarray()
+                X_inputs_tensor = torch.from_numpy(X_inputs).to(torch.float32)
+
+                y_true = np.array(adata.obs[age_col])
+                cell_ids = list(adata.obs[cell_id_col])
+                y_predicted = model(X_inputs_tensor).flatten().cpu().numpy()
+                age_diff = np.array(y_predicted) - np.array(y_true)
+
+                cell_df = pd.DataFrame({
+                    "cell_id": cell_ids,
+                    "cell_age_true": y_true,
+                    "cell_age_predicted": y_predicted,
+                    "cell_age_diff": age_diff,
+                    "Monte_Carlo_index": mc_index
+                })
+
+                dfs.append(cell_df)
+
+                # memory clean up
+                del adata, X_inputs_tensor, X_inputs
+                torch.cuda.empty_cache() if device.type == 'cuda' else None
+
+            ## concatenate for each MC iteration
+            cell_df = pd.concat(dfs, ignore_index=True)
+            output_file = os.path.join(output_dir, f"{output_prefix}_Iter{mc_index}.csv")
+            cell_df.to_csv(output_file, index=False)
+
+    return True
+
 
 def calculate_group_metrics(df,
                       group_id="cell_type",
