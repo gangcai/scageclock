@@ -7,3 +7,4 @@ scageclock/model/__pycache__/
 .idea/scageclock.iml
 dist/
 tmp/
+data/pytest_data/*
