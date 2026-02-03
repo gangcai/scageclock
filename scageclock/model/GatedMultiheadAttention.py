@@ -345,7 +345,7 @@ class GatedMultiheadAttentionAgeClock:
                         loss = self.criterion(outputs, targets) + self.model.feature_gate.loss() ## use total loss
                         all_batch_val_loss_list.append(loss.item())
                         total_val_loss += loss.item() * inputs.size(0)
-                        if iter_num % self.log_step == 1:
+                        if iter_num % self.log_step == 0:
                             end_time = time.perf_counter()
                             logging.info(f"accumulated time relapsed for iteration {iter_num}: {end_time - start_time} seconds (validation stage)")
                             logging.info(f"validation loss: {loss.item()}")
