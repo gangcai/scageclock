@@ -1,3 +1,9 @@
+![scAgeClock graphical abstract](assets/scAgeClock_GraphAbstract.tif)
+
+<p align="center">
+  <img src="assets/scAgeClock_GraphAbstract.tif" alt="scAgeClock graphical abstract" width="100%">
+</p>
+
 # scAgeClock
 scAgeClock: a single-cell transcriptome based human aging clock model using gated multi-head attention neural networks
 ## Quick Start
@@ -239,3 +245,6 @@ results = training_pipeline(model_name=model_name,
 ## About the author
 - Author: Gangcai Xie (Medical School of Nantong University); 
 - [ORCID](https://orcid.org/0000-0002-8286-2987)
+
+## Citation
+- [Xie, G. scAgeClock: a single-cell transcriptome-based human aging clock model using gated multi-head attention neural networks. npj Aging (2026). https://doi.org/10.1038/s41514-026-00379-5] (https://doi.org/10.1038/s41514-026-00379-5)
