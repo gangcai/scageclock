@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="scAgeClock_GraphicAbstract.jpg" alt="scAgeClock graphical abstract" width="100%">
+  <img src="assets/scAgeClock_GraphicAbstract.jpg" alt="scAgeClock graphical abstract" width="100%">
 </p>
 
 # scAgeClock
