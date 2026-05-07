@@ -1,7 +1,5 @@
-![scAgeClock graphical abstract](assets/scAgeClock_GraphAbstract.tif)
-
 <p align="center">
-  <img src="assets/scAgeClock_GraphAbstract.tif" alt="scAgeClock graphical abstract" width="100%">
+  <img src="scAgeClock_GraphicAbstract.jpg" alt="scAgeClock graphical abstract" width="100%">
 </p>
 
 # scAgeClock
@@ -247,4 +245,4 @@ results = training_pipeline(model_name=model_name,
 - [ORCID](https://orcid.org/0000-0002-8286-2987)
 
 ## Citation
-- [Xie, G. scAgeClock: a single-cell transcriptome-based human aging clock model using gated multi-head attention neural networks. npj Aging (2026). https://doi.org/10.1038/s41514-026-00379-5] (https://doi.org/10.1038/s41514-026-00379-5)
+- Xie, G. scAgeClock: a single-cell transcriptome-based human aging clock model using gated multi-head attention neural networks. npj Aging (2026). https://doi.org/10.1038/s41514-026-00379-5
