@@ -31,7 +31,7 @@ results_df = prediction(model_file=model_file,
 % conda create -n scAgeClock
 % conda activate scAgeClock
 % conda install python=3.12
-% pip install scageclock-0.1.3.tar.gz # download the latest release
+% pip install scageclock-0.1.4.tar.gz # download the latest release
 ```
 ### check for the installation
 #### check scAgeClock command
