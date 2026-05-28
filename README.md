@@ -146,7 +146,7 @@ for chunk_df in split_dfs:
 - linear (Elastic Net based Linear regression model)
 - xgboost 
 - catboost
-- AutoencoderAgeClock (AE+linear regressor or AE+MLP regressor)
+- Autoencoder (AE+linear regressor or AE+MLP regressor)
 
 ### making age prediction (python script version)
 ```python
